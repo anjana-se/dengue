@@ -1,11 +1,16 @@
 import { logger } from '../../shared/logger';
+import { SOCKET_EVENTS, SOCKET_ROOMS } from '../../config/constants';
 
 /**
- * services/notifications/notifications.service.ts — Stub (Step 6).
+ * services/notifications/notifications.service.ts
  *
- * Emit helpers used by the AI worker and other services.
- * Full Socket.IO implementation is in Step 6.
- * These stubs allow the consumer to compile and run without Socket.IO being wired.
+ * Real emit helpers — replaces the Step 4 stub.
+ * Every other service calls into these functions rather than touching
+ * socket.server.ts directly, keeping the event contract in one place.
+ *
+ * Uses a lazy getIO() import so the module compiles even if Socket.IO
+ * hasn't been initialised yet (e.g. in the worker process which doesn't
+ * start the HTTP server).
  */
 
 export interface ReportAnalysedPayload {
@@ -22,6 +27,12 @@ export interface WorkOrderCreatedPayload {
   priority_score: number;
 }
 
+export interface WorkOrderAssignedPayload {
+  workorder_id: string;
+  assigned_to: string;   // PHI user ID
+  report_id: string;
+}
+
 export interface ZoneUpdatedPayload {
   zone_id: string;
   risk_level: string;
@@ -29,15 +40,60 @@ export interface ZoneUpdatedPayload {
   active_report_count: number;
 }
 
-// These will be replaced with real Socket.IO emits in Step 6
+function tryGetIO() {
+  try {
+    // Dynamic import avoids circular deps and allows worker process to run
+    // without a live Socket.IO server
+    const { getIO } = require('./socket.server') as typeof import('./socket.server');
+    return getIO();
+  } catch {
+    // Worker process has no Socket.IO — log only
+    return null;
+  }
+}
+
 export function emitReportAnalysed(payload: ReportAnalysedPayload): void {
-  logger.debug('[Notification stub] report:analysed', payload);
+  const io = tryGetIO();
+  if (io) {
+    // Broadcast to all NDCU admins and to the zone's PHI officers
+    io.to(SOCKET_ROOMS.NDCU_ADMINS).emit(SOCKET_EVENTS.REPORT_ANALYSED, payload);
+    if (payload.risk_level === 'high' || payload.risk_level === 'critical') {
+      logger.info('[Socket] report:analysed emitted to ndcu_admins', { reportId: payload.report_id });
+    }
+  } else {
+    logger.debug('[Socket stub] report:analysed', payload);
+  }
 }
 
 export function emitWorkOrderCreated(payload: WorkOrderCreatedPayload): void {
-  logger.debug('[Notification stub] workorder:created', payload);
+  const io = tryGetIO();
+  if (io) {
+    io.to(SOCKET_ROOMS.NDCU_ADMINS).emit(SOCKET_EVENTS.WORKORDER_CREATED, payload);
+    logger.info('[Socket] workorder:created emitted', { workorderId: payload.workorder_id });
+  } else {
+    logger.debug('[Socket stub] workorder:created', payload);
+  }
+}
+
+export function emitWorkOrderAssigned(payload: WorkOrderAssignedPayload): void {
+  const io = tryGetIO();
+  if (io) {
+    const phiRoom = SOCKET_ROOMS.phiRoom(payload.assigned_to);
+    io.to(phiRoom).emit(SOCKET_EVENTS.WORKORDER_ASSIGNED, payload);
+    io.to(SOCKET_ROOMS.NDCU_ADMINS).emit(SOCKET_EVENTS.WORKORDER_ASSIGNED, payload);
+    logger.info('[Socket] workorder:assigned emitted', { workorderId: payload.workorder_id });
+  } else {
+    logger.debug('[Socket stub] workorder:assigned', payload);
+  }
 }
 
 export function emitZoneUpdated(payload: ZoneUpdatedPayload): void {
-  logger.debug('[Notification stub] zone:updated', payload);
+  const io = tryGetIO();
+  if (io) {
+    // Broadcast zone updates to all privileged users
+    io.to(SOCKET_ROOMS.NDCU_ADMINS).emit(SOCKET_EVENTS.ZONE_UPDATED, payload);
+    logger.debug('[Socket] zone:updated emitted', { zoneId: payload.zone_id });
+  } else {
+    logger.debug('[Socket stub] zone:updated', payload);
+  }
 }

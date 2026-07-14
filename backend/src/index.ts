@@ -2,16 +2,20 @@ import http from 'http';
 import { createApp, config } from './app';
 import { logger } from './shared/logger';
 import { pool } from './db/client';
+import { initSocketServer } from './services/notifications/socket.server';
 
 /**
  * src/index.ts — API process entry point.
- * Creates the HTTP server, starts listening, and handles graceful shutdown.
- * Socket.IO will attach to this http.Server instance once notifications/ is built.
+ * Creates the HTTP server, attaches Socket.IO, starts listening,
+ * and handles graceful shutdown.
  */
 
 async function bootstrap() {
   const app = createApp();
   const server = http.createServer(app);
+
+  // Attach Socket.IO to the same http.Server instance
+  initSocketServer(server);
 
   // ─── Graceful shutdown ──────────────────────────────────────────────────────
   const shutdown = async (signal: string) => {

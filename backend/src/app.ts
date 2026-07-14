@@ -12,6 +12,9 @@ import { authRouter } from './services/auth/auth.routes';
 import { reportsRouter } from './services/reports/reports.routes';
 import { workordersRouter } from './services/workorders/workorders.routes';
 import { zonesRouter } from './services/zones/zones.routes';
+import { droneRouter } from './services/drone/drone.routes';
+import { chatRouter } from './services/chat/chat.routes';
+import { dashboardRouter } from './services/dashboard/dashboard.routes';
 
 /**
  * app.ts — Express application assembly.
@@ -58,10 +61,9 @@ export function createApp() {
   app.use(`${config.API_BASE_PATH}/reports`, reportsRouter);        // ✅ Step 3
   app.use(`${config.API_BASE_PATH}/workorders`, workordersRouter);  // ✅ Step 5
   app.use(`${config.API_BASE_PATH}/zones`, zonesRouter);            // ✅ Step 5
-
-  // app.use(`${config.API_BASE_PATH}/drone`,      droneRouter);      // Step 7
-  // app.use(`${config.API_BASE_PATH}/dashboard`,  dashboardRouter);  // Step 9
-  // app.use(`${config.API_BASE_PATH}/chat`,       chatRouter);       // Step 8
+  app.use(`${config.API_BASE_PATH}/drone`, droneRouter);            // ✅ Step 7
+  app.use(`${config.API_BASE_PATH}/chat`, chatRouter);              // ✅ Step 8
+  app.use(`${config.API_BASE_PATH}/dashboard`, dashboardRouter);    // ✅ Step 9
 
   // ─── 404 fallback ────────────────────────────────────────────────────────────
   app.use((_req: Request, res: Response) => {
