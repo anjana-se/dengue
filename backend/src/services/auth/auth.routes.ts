@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
 import { requireRole } from '../../middleware/rbac.middleware';
 import { validate } from '../../middleware/validate.middleware';
-import { authRateLimiter } from '../../middleware/rateLimit.middleware';
+import { authRateLimiter, emailOtpRateLimiter } from '../../middleware/rateLimit.middleware';
 import {
   requestOtpSchema,
   verifyOtpSchema,
@@ -38,7 +38,7 @@ export const authRouter = Router();
 // OTP flow — community reporters
 authRouter.post(
   '/otp/request',
-  authRateLimiter,
+  emailOtpRateLimiter,
   validate(requestOtpSchema),
   handleRequestOtp,
 );

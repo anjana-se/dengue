@@ -1,11 +1,11 @@
 import crypto from 'crypto';
 import {
   findUserByEmail,
-  findUserByPhone,
   createUser,
   updateLastLogin,
 } from '../../db/queries/users.queries';
 import { createOtp, verifyOtp } from './otp.store';
+import { sendOtpEmail } from '../../integrations/email/client';
 import {
   signAccessToken,
   signRefreshToken,
@@ -79,11 +79,11 @@ function sanitizeUser(user: User) {
 // ─── OTP flow (community reporters) ─────────────────────────────────────────
 
 /**
- * Step 1: Request an OTP for a given phone number.
- * Auto-creates a community_reporter account if the phone hasn't been seen before.
+ * Step 1: Request an OTP for a given email address.
+ * Auto-creates a community_reporter account if the email hasn't been seen before.
  */
 export async function requestOtpService(input: RequestOtpInput) {
-  let user = await findUserByPhone(input.phone);
+  let user: User | null = await findUserByEmail(input.email);
 
   if (!user) {
     // First-time user — auto-register as community_reporter
@@ -93,27 +93,30 @@ export async function requestOtpService(input: RequestOtpInput) {
         'FULL_NAME_REQUIRED',
       );
     }
-    user = await createUser({
-      phone: input.phone,
+    const newUser = await createUser({
+      email: input.email,
       full_name: input.full_name,
       role: ROLES.COMMUNITY_REPORTER,
     });
-    logger.info('New community reporter auto-registered', { userId: user.id });
+    user = newUser;
+    logger.info('New community reporter auto-registered via email', { userId: user.id });
   }
 
   if (!user.is_active) {
     throw new ForbiddenError('Account is deactivated', 'ACCOUNT_DEACTIVATED');
   }
 
-  await createOtp(input.phone);
-  return { message: 'OTP sent successfully', phone: input.phone };
+  const code = await createOtp(input.email);
+  await sendOtpEmail(input.email, code);
+
+  return { message: 'OTP sent successfully to email', email: input.email };
 }
 
 /**
  * Step 2: Verify OTP and issue JWT tokens.
  */
 export async function verifyOtpService(input: VerifyOtpInput) {
-  const result = await verifyOtp(input.phone, input.code);
+  const result = await verifyOtp(input.email, input.code);
 
   if (!result.success) {
     const messages: Record<string, string> = {
@@ -127,7 +130,7 @@ export async function verifyOtpService(input: VerifyOtpInput) {
     );
   }
 
-  const user = await findUserByPhone(input.phone);
+  const user = await findUserByEmail(input.email);
   if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
   if (!user.is_active) throw new ForbiddenError('Account is deactivated', 'ACCOUNT_DEACTIVATED');
 

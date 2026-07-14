@@ -1,20 +1,15 @@
 import { createClient } from 'redis';
+import crypto from 'crypto';
 import { config } from '../../config/env';
 import { logger } from '../../shared/logger';
 
 /**
  * services/auth/otp.store.ts — Redis-backed OTP storage with automatic TTL.
  *
- * Key pattern: `otp:{phone}` → OTP code (string)
+ * Key pattern: `otp:{email}` → Hashed OTP code (string)
  * TTL: OTP_EXPIRES_IN_SECONDS (default 300 = 5 minutes)
  *
- * Using Redis for OTPs means:
- *  - No cleanup cron needed — Redis evicts expired keys automatically
- *  - OTPs are never persisted to the main Postgres DB (separation of concerns)
- *
- * SMS delivery: this module stores + verifies OTPs.
- * Actual SMS sending is stubbed — wire in your chosen provider
- * (Twilio, Vonage, AWS SNS, Dialog, Mobitel, etc.) in sendOtp().
+ * Uses SHA-256 to hash the code before saving to Redis to prevent exposure.
  */
 
 // Shared Redis client — reused across OTP operations
@@ -34,12 +29,12 @@ async function getRedisClient() {
   return redisClient;
 }
 
-function otpKey(phone: string): string {
-  return `otp:${phone}`;
+function otpKey(email: string): string {
+  return `otp:${email.toLowerCase().trim()}`;
 }
 
-function attemptKey(phone: string): string {
-  return `otp_attempts:${phone}`;
+function attemptKey(email: string): string {
+  return `otp_attempts:${email.toLowerCase().trim()}`;
 }
 
 const MAX_VERIFY_ATTEMPTS = 5;
@@ -47,7 +42,7 @@ const MAX_VERIFY_ATTEMPTS = 5;
 /**
  * Generates a numeric OTP of length OTP_LENGTH.
  */
-function generateOtp(): string {
+function generateOtpCode(): string {
   const digits = '0123456789';
   let otp = '';
   for (let i = 0; i < config.OTP_LENGTH; i++) {
@@ -57,78 +52,74 @@ function generateOtp(): string {
 }
 
 /**
- * Creates and stores an OTP for the given phone number.
- * Returns the generated OTP so the caller can send it via SMS.
- * Overwrites any existing OTP for the same phone (rate limiting is handled separately).
+ * Hashes the raw code using SHA-256.
  */
-export async function createOtp(phone: string): Promise<string> {
-  const client = await getRedisClient();
-  const otp = generateOtp();
-
-  await client.setEx(otpKey(phone), config.OTP_EXPIRES_IN_SECONDS, otp);
-  // Reset attempt counter when a fresh OTP is issued
-  await client.del(attemptKey(phone));
-
-  logger.debug('OTP created', { phone: phone.slice(0, 5) + '***' });
-
-  // ─── SMS delivery stub ─────────────────────────────────────────────────────
-  // Replace this block with your chosen SMS provider SDK call.
-  // Example (Twilio):
-  //   await twilioClient.messages.create({
-  //     body: `Your DengueGuard verification code is ${otp}`,
-  //     from: process.env.TWILIO_PHONE_NUMBER,
-  //     to: phone,
-  //   });
-  if (config.NODE_ENV !== 'production') {
-    logger.warn(`[DEV ONLY] OTP for ${phone.slice(0, 5)}***: ${otp}`);
-  }
-
-  return otp;
+function hashOtp(code: string): string {
+  return crypto.createHash('sha256').update(code).digest('hex');
 }
 
 /**
- * Verifies an OTP for the given phone number.
+ * Creates and stores an OTP hash for the given email.
+ * Returns the raw generated OTP code (to be sent via email).
+ */
+export async function createOtp(email: string): Promise<string> {
+  const client = await getRedisClient();
+  const rawCode = generateOtpCode();
+  const hashedCode = hashOtp(rawCode);
+
+  await client.setEx(otpKey(email), config.OTP_EXPIRES_IN_SECONDS, hashedCode);
+  // Reset attempt counter when a fresh OTP is issued
+  await client.del(attemptKey(email));
+
+  logger.debug('OTP hash created and stored in Redis', { email });
+  return rawCode;
+}
+
+/**
+ * Verifies an OTP code for the given email.
  * Returns true on success, false on wrong code.
  * Throws if the OTP has expired (key no longer in Redis) or max attempts exceeded.
  */
 export async function verifyOtp(
-  phone: string,
+  email: string,
   submittedCode: string,
 ): Promise<{ success: boolean; reason?: string }> {
   const client = await getRedisClient();
 
   // Check attempt count
-  const attemptsRaw = await client.get(attemptKey(phone));
+  const attemptsRaw = await client.get(attemptKey(email));
   const attempts = parseInt(attemptsRaw ?? '0', 10);
   if (attempts >= MAX_VERIFY_ATTEMPTS) {
     return { success: false, reason: 'TOO_MANY_ATTEMPTS' };
   }
 
-  const stored = await client.get(otpKey(phone));
-  if (!stored) {
+  const storedHash = await client.get(otpKey(email));
+  if (!storedHash) {
     return { success: false, reason: 'EXPIRED_OR_NOT_FOUND' };
   }
 
-  if (stored !== submittedCode) {
+  const submittedHash = hashOtp(submittedCode);
+
+  if (storedHash !== submittedHash) {
     // Increment attempt counter; inherit remaining TTL from the OTP key
-    const ttl = await client.ttl(otpKey(phone));
-    await client.setEx(attemptKey(phone), ttl, String(attempts + 1));
+    const ttl = await client.ttl(otpKey(email));
+    await client.setEx(attemptKey(email), ttl > 0 ? ttl : 60, String(attempts + 1));
     return { success: false, reason: 'WRONG_CODE' };
   }
 
   // Success — invalidate OTP so it can't be reused
-  await client.del(otpKey(phone));
-  await client.del(attemptKey(phone));
+  await client.del(otpKey(email));
+  await client.del(attemptKey(email));
   return { success: true };
 }
 
 /**
  * Deletes an OTP (e.g. after successful login to prevent replay).
  */
-export async function invalidateOtp(phone: string): Promise<void> {
+export async function invalidateOtp(email: string): Promise<void> {
   const client = await getRedisClient();
-  await client.del(otpKey(phone));
-  await client.del(attemptKey(phone));
+  await client.del(otpKey(email));
+  await client.del(attemptKey(email));
 }
 
 /**

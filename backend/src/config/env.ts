@@ -61,8 +61,9 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
 
-  // SMS OTP provider (optional — TBD provider)
-  SMS_OTP_PROVIDER_API_KEY: z.string().optional(),
+  // Email Resend provider
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().default('onboarding@resend.dev'),
 });
 
 const parsed = envSchema.safeParse(process.env);

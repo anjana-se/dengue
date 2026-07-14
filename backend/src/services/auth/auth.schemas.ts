@@ -8,22 +8,14 @@ import { z } from 'zod';
 // ─── OTP flow (community reporters) ─────────────────────────────────────────
 
 export const requestOtpSchema = z.object({
-  phone: z
-    .string()
-    .min(7, 'Phone number too short')
-    .max(20, 'Phone number too long')
-    .regex(/^\+?[0-9\s\-().]+$/, 'Invalid phone number format'),
+  email: z.string().email('Invalid email address'),
   full_name: z.string().min(2).max(100).optional(),
 });
 
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
 
 export const verifyOtpSchema = z.object({
-  phone: z
-    .string()
-    .min(7)
-    .max(20)
-    .regex(/^\+?[0-9\s\-().]+$/),
+  email: z.string().email('Invalid email address'),
   code: z
     .string()
     .length(6, 'OTP must be exactly 6 digits')

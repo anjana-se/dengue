@@ -92,7 +92,9 @@ The database is built on relational schemas with spatial PostGIS geometry:
 
 ### 1. Identity & Security (Step 2)
 * **RBAC:** Four roles (`community_reporter`, `drone_operator`, `phi`, `ndcu_admin`) enforced via route-level middleware.
-* **OTP Store:** Redis-backed stateless OTP storage with a configurable TTL, login attempt limitation, and rate limiting.
+* **OTP Store:** Redis-backed stateless OTP storage using SHA-256 code hashing, expiring in 5 minutes.
+* **Transactional Email delivery:** Integrates Resend SDK to send 6-digit OTP codes directly to user emails.
+* **Rate Limiting:** IP-based generic rate limits plus a strict email-specific OTP rate limiter (max 3 requests per 5 minutes per email) to prevent spamming.
 * **Audit Trail:** Immutable logging on all write requests (POST/PATCH/DELETE) tracking who modified what, including old/new JSON payloads.
 
 ### 2. Multi-Driver Storage & Metadata Processing (Step 3)
@@ -139,9 +141,9 @@ All endpoints are prefixed with `/api/v1` and authenticated using JWT:
 
 ```
 # Authentication
-POST   /auth/reporter/request-otp     # Request SMS verification code
-POST   /auth/reporter/verify-otp      # Complete OTP verification, returns tokens
-POST   /auth/staff/login              # Staff password verification
+POST   /auth/otp/request              # Request verification code to email (rate-limited per email)
+POST   /auth/otp/verify               # Complete email OTP verification, returns tokens
+POST   /auth/login                    # Staff email/password verification
 POST   /auth/staff/register           # Register new staff member (Admin only)
 POST   /auth/refresh                  # Refresh access token
 GET    /auth/me                       # Fetch current user profile
@@ -205,6 +207,10 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 OTP_LENGTH=6
 OTP_EXPIRES_IN_SECONDS=300
+
+# Email Resend provider
+RESEND_API_KEY=re_your_api_key
+RESEND_FROM_EMAIL=onboarding@resend.dev
 
 # Gemini Generative AI
 GEMINI_API_KEY=AIzaSy...your-gemini-key
