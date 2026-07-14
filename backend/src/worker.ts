@@ -1,29 +1,24 @@
 import { logger } from './shared/logger';
 import { pool } from './db/client';
+import { startWorker, stopWorker } from './ai/queue/consumer';
 
 /**
  * src/worker.ts — BullMQ worker process entry point.
- * Pulls jobs off the 'ai-analysis' queue, runs Gemini vision analysis,
- * and writes results back to Postgres.
- *
- * The actual worker logic lives in ai/queue/consumer.ts.
- * This file handles process lifecycle only.
+ * Starts the AI analysis consumer and handles graceful shutdown.
  */
 
 async function bootstrap() {
   logger.info('🔧 DengueGuard Worker starting...');
 
-  // Import consumer — will be implemented in Step 4 (AI queue module)
-  // const { startWorker } = await import('./ai/queue/consumer');
-  // startWorker();
+  // Start the AI analysis worker
+  startWorker();
 
-  logger.info('⏳ Worker is running. Waiting for AI analysis jobs...');
-  logger.warn('AI queue consumer not yet wired — implement ai/queue/consumer.ts (Step 4)');
+  logger.info('✅ AI analysis worker running. Listening for jobs on queue: ai-analysis');
 
   // ─── Graceful shutdown ──────────────────────────────────────────────────────
   const shutdown = async (signal: string) => {
     logger.info(`Worker received ${signal}. Shutting down gracefully...`);
-    // worker.close() will be called here once consumer.ts is built
+    await stopWorker();
     await pool.end();
     logger.info('Worker shut down. DB pool drained.');
     process.exit(0);
