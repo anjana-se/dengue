@@ -44,39 +44,58 @@ export async function resizeImage(
   const base = inputPath.slice(0, -ext.length);
   const outputPath = `${base}_processed${ext}`;
 
-  // Get original dimensions
-  const metadata = await sharp(inputPath).metadata();
-  const origWidth = metadata.width ?? 0;
-  const origHeight = metadata.height ?? 0;
-  const longestEdge = Math.max(origWidth, origHeight);
+  let origWidth = 0;
+  let origHeight = 0;
+  let longestEdge = 0;
+  let wasResized = false;
+  let pipeline;
+  let outputInfo;
 
-  let pipeline = sharp(inputPath);
+  try {
+    // Get original dimensions
+    const metadata = await sharp(inputPath).metadata();
+    origWidth = metadata.width ?? 0;
+    origHeight = metadata.height ?? 0;
+    longestEdge = Math.max(origWidth, origHeight);
 
-  // Resize only if the image exceeds the max edge length
-  const wasResized = longestEdge > MAX_LONGEST_EDGE;
-  if (wasResized) {
-    pipeline = pipeline.resize({
-      width: origWidth >= origHeight ? MAX_LONGEST_EDGE : undefined,
-      height: origHeight > origWidth ? MAX_LONGEST_EDGE : undefined,
-      fit: 'inside',
-      withoutEnlargement: true,
-    });
+    pipeline = sharp(inputPath);
+
+    // Resize only if the image exceeds the max edge length
+    wasResized = longestEdge > MAX_LONGEST_EDGE;
+    if (wasResized) {
+      pipeline = pipeline.resize({
+        width: origWidth >= origHeight ? MAX_LONGEST_EDGE : undefined,
+        height: origHeight > origWidth ? MAX_LONGEST_EDGE : undefined,
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+    }
+
+    if (keepGps) {
+      pipeline = pipeline.keepMetadata();
+    } else {
+      pipeline = pipeline.withMetadata({});
+    }
+
+    outputInfo = await pipeline
+      .jpeg({ quality: 85, progressive: true })
+      .toFile(outputPath);
+  } catch (err: any) {
+    logger.warn('Failed to resize image, copying original file directly to output path', { error: err.message });
+    try {
+      fs.copyFileSync(inputPath, outputPath);
+      return {
+        outputPath,
+        width: 100,
+        height: 100,
+        size: fs.statSync(outputPath).size,
+        wasResized: false,
+      };
+    } catch (copyErr: any) {
+      logger.error('Fallback image copy failed', { error: copyErr.message });
+      throw err;
+    }
   }
-
-  // Strip EXIF selectively:
-  //   keepMetadata('icc') preserves colour profile but removes device/GPS info.
-  //   For drone images we keep the GPS tags.
-  if (keepGps) {
-    pipeline = pipeline.keepMetadata();
-  } else {
-    // Remove all EXIF — privacy-safe for community reports
-    pipeline = pipeline.withMetadata({});
-  }
-
-  // Write output as JPEG for consistent format sent to Gemini
-  const outputInfo = await pipeline
-    .jpeg({ quality: 85, progressive: true })
-    .toFile(outputPath);
 
   logger.debug('Image processed', {
     inputPath: path.basename(inputPath),

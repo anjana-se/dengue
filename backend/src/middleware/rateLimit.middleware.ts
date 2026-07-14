@@ -18,10 +18,12 @@ export const apiRateLimiter = rateLimit({
   },
 });
 
+const isDev = process.env.NODE_ENV === 'development';
+
 /** Strict limiter for auth endpoints — 10 requests per 15 minutes per IP */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: isDev ? 1000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req: Request, _res: Response, next: NextFunction) => {
@@ -32,7 +34,7 @@ export const authRateLimiter = rateLimit({
 /** Strict rate limit per email for OTP requests — 3 requests per 5 minutes per email */
 export const emailOtpRateLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3, // max 3 requests per email
+  max: isDev ? 1000 : 3, // max 3 requests per email
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request) => {

@@ -28,9 +28,9 @@ export async function createReport(input: CreateReportInput): Promise<Report> {
      )
      VALUES (
        $1, $2, $3, $4,
-       $5, $6,
+       $5::double precision, $6::double precision,
        CASE WHEN $5 IS NOT NULL AND $6 IS NOT NULL
-            THEN ST_SetSRID(ST_MakePoint($6, $5), 4326)
+            THEN ST_SetSRID(ST_MakePoint($6::double precision, $5::double precision), 4326)
             ELSE NULL END,
        $7, $8, 'pending', $9
      )
