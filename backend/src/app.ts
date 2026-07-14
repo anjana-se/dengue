@@ -2,12 +2,14 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
 import { config, corsOrigins } from './config/env';
 import { apiRateLimiter } from './middleware/rateLimit.middleware';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { checkDbConnection } from './db/client';
 import { logger } from './shared/logger';
 import { authRouter } from './services/auth/auth.routes';
+import { reportsRouter } from './services/reports/reports.routes';
 
 /**
  * app.ts — Express application assembly.
@@ -42,12 +44,17 @@ export function createApp() {
     });
   });
 
+  // ─── Static file serving (local storage driver only) ─────────────────────
+  if (config.STORAGE_DRIVER === 'local') {
+    app.use('/uploads', express.static(path.resolve(config.UPLOADS_DIR)));
+  }
+
   // ─── API routes ──────────────────────────────────────────────────────────
   // Mounted as each service module is built. Uncomment as you go.
 
-  app.use(`${config.API_BASE_PATH}/auth`, authRouter);           // ✅ Step 2
+  app.use(`${config.API_BASE_PATH}/auth`, authRouter);              // ✅ Step 2
+  app.use(`${config.API_BASE_PATH}/reports`, reportsRouter);        // ✅ Step 3
 
-  // app.use(`${config.API_BASE_PATH}/reports`,    reportsRouter);    // Step 3
   // app.use(`${config.API_BASE_PATH}/drone`,      droneRouter);      // Step 7
   // app.use(`${config.API_BASE_PATH}/workorders`, workordersRouter); // Step 5
   // app.use(`${config.API_BASE_PATH}/zones`,      zonesRouter);      // Step 5
