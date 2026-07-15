@@ -29,12 +29,19 @@ const envSchema = z.object({
   OTP_LENGTH: z.coerce.number().int().min(4).max(10).default(6),
   OTP_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(300),
 
+  // AI Service Provider Configuration
+  AI_PROVIDER: z.enum(['gemini', 'nvidia']).default('gemini'),
+
   // Gemini AI
-  GEMINI_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().optional(),
   GEMINI_CHAT_MODEL: z.string().default('gemini-2.0-flash-lite'),
   GEMINI_VISION_MODEL: z.string().default('gemini-2.0-flash-lite'),
   GEMINI_TRANSLATION_MODEL: z.string().default('gemini-2.0-flash-lite'),
   AI_ANALYSIS_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.7),
+
+  // NVIDIA NIM AI
+  NVIDIA_API_KEY: z.string().optional(),
+  NVIDIA_VISION_MODEL: z.string().default('meta/llama-3.2-11b-vision-instruct'),
 
   // Storage
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),

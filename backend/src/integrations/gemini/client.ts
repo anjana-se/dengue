@@ -13,7 +13,7 @@ let _client: GoogleGenerativeAI | null = null;
 
 function getClient(): GoogleGenerativeAI {
   if (!_client) {
-    _client = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+    _client = new GoogleGenerativeAI(config.GEMINI_API_KEY || '');
   }
   return _client;
 }

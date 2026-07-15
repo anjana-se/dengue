@@ -4,6 +4,7 @@ import { config } from '../../config/env';
 import { QUEUE_NAMES, RISK_LEVELS } from '../../config/constants';
 import { logger } from '../../shared/logger';
 import { analyzeBreedingSiteImage } from '../../integrations/gemini/visionAnalysis';
+import { analyzeBreedingSiteImageNvidia } from '../../integrations/nvidia/visionAnalysis';
 import { resizeImage, cleanupProcessedFile } from '../../imageProcessing/resize.util';
 import { updateReportAnalysis, updateReportStatus } from '../../db/queries/reports.queries';
 import { createWorkOrder } from '../../db/queries/workorders.queries';
@@ -81,8 +82,10 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
     const resized = await resizeImage(imagePath, { keepGps: false });
     processedImagePath = resized.outputPath;
 
-    // ── 4. Gemini vision analysis (includes translations inline) ───────────
-    const analysis = await analyzeBreedingSiteImage(processedImagePath, 'image/jpeg');
+    // ── 4. Vision analysis (dynamic provider selection) ───────────────────
+    const analysis = config.AI_PROVIDER === 'nvidia'
+      ? await analyzeBreedingSiteImageNvidia(processedImagePath, 'image/jpeg')
+      : await analyzeBreedingSiteImage(processedImagePath, 'image/jpeg');
 
     // ── 5 + 6. Persist analysis result ────────────────────────────────────
     const finalStatus = analysis.needs_human_review ? 'needs_human_review' : 'complete';
