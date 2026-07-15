@@ -1,0 +1,101 @@
+/* DengueGuard global styles — ported from the design's <helmet> block. */
+@import "leaflet/dist/leaflet.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #e6e9e6;
+  font-family: Inter, "Noto Sans Sinhala", "Noto Sans Tamil", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #1c2b26;
+}
+
+a {
+  color: #0d4a3e;
+}
+a:hover {
+  color: #0a3a30;
+}
+
+input,
+button,
+textarea {
+  font-family: inherit;
+}
+
+/* Leaflet tuning to match the muted design palette */
+.lf-map {
+  filter: saturate(0.9);
+}
+.leaflet-container {
+  background: #dce6e2;
+}
+
+@keyframes dgpulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes dgspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes dgsheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes dgfade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes dgring {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes dgslide {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
