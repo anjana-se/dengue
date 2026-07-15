@@ -160,4 +160,4 @@ Run the test suite from the `backend/` directory:
 npx ts-node scripts/validate.ts
 ```
 
-Refer to the validation status checkmarks inside [**`backend/api.md`**](file:///f:/AtLink/Github/dengue/backend/api.md) for live server compliance details.
+Refer to the validation status checkmarks inside [**`backend/api.md`**](/backend/api.md) for live server compliance details.
