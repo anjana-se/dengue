@@ -44,7 +44,7 @@ RESPONSE INSTRUCTIONS:
 5. guidance_text_si must be a high-quality translation of guidance_text in Sinhala (සිංහල).
 6. guidance_text_ta must be a high-quality translation of guidance_text in Tamil (தமிழ்).
 For both translations: Preserve technical terms (dengue, Aedes aegypti, larvae, larvicide) without translation, and use language appropriate for literate field officers.
-7. If the image is too blurry, too dark, or clearly not a dengue-related site, set confidence_score below 0.5.
+7. If the image is too blurry, too dark, blank, or clearly not a dengue-related site, set confidence_score below 0.5. In this case, set guidance_text to "The uploaded image is blank, blurry, or does not show any Aedes mosquito breeding risks." and provide the correct Sinhala and Tamil translations for this message.
 
 EXPECTED JSON SCHEMA:
 ${VISION_RESPONSE_SCHEMA_EXAMPLE}`;
