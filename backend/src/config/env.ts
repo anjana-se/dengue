@@ -39,6 +39,7 @@ const envSchema = z.object({
   // Storage
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   UPLOADS_DIR: z.string().default('./uploads'),
+  PUBLIC_URL: z.string().url().optional(),
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().default('ap-south-1'),
   S3_ACCESS_KEY_ID: z.string().optional(),

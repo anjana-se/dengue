@@ -21,7 +21,8 @@ export class LocalStorageDriver implements StorageDriver {
   constructor() {
     this.uploadsDir = path.resolve(config.UPLOADS_DIR);
     // Base URL for serving uploaded files
-    this.baseUrl = `http://localhost:${config.PORT}/uploads`;
+    const publicUrl = config.PUBLIC_URL ? config.PUBLIC_URL.replace(/\/$/, '') : `http://localhost:${config.PORT}`;
+    this.baseUrl = `${publicUrl}/uploads`;
 
     // Ensure uploads directory exists
     if (!fs.existsSync(this.uploadsDir)) {
