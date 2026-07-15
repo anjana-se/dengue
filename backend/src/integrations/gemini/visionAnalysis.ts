@@ -28,6 +28,14 @@ export async function analyzeBreedingSiteImage(
   const imageBytes = await fs.promises.readFile(imagePath);
   const base64Image = imageBytes.toString('base64');
 
+  logger.info('DEBUG [AI Image Data]: Sending image to Gemini API', {
+    imagePath,
+    fileSizeInBytes: imageBytes.length,
+    base64Length: base64Image.length,
+    base64Prefix: base64Image.slice(0, 50),
+    mimeType,
+  });
+
   const model = getModel(config.GEMINI_VISION_MODEL);
   const systemPrompt = buildVisionSystemPrompt();
   const userPrompt = buildVisionUserPrompt();

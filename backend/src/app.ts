@@ -30,6 +30,9 @@ import { dashboardRouter } from './services/dashboard/dashboard.routes';
 export function createApp() {
   const app = express();
 
+  // Trust proxy headers from reverse proxy (Nginx)
+  app.set('trust proxy', true);
+
   // ─── Core middleware ─────────────────────────────────────────────────────────
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
