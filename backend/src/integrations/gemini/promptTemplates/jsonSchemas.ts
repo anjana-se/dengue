@@ -28,20 +28,18 @@ export const visionAnalysisResponseSchema = z.object({
 
 export type VisionAnalysisResponse = z.infer<typeof visionAnalysisResponseSchema>;
 
-/** The JSON schema as a string — embedded in the Gemini prompt */
-export const VISION_RESPONSE_SCHEMA_EXAMPLE = JSON.stringify(
-  {
-    site_type: 'plastic_container | drain | tyre | construction_water | flower_pot | roof_gutter | other',
-    risk_level: 'low | medium | high | critical',
-    confidence_score: 0.92,
-    breeding_indicators: ['stagnant water visible', 'larvae detected', 'dark organic sediment'],
-    guidance_text: 'Discard the container immediately and ensure the area is kept dry to prevent water accumulation.',
-    guidance_text_si: 'භාජනය වහාම ඉවත් කර ජලය රැස්වීම වැළැක්වීම සඳහා ප්‍රදේශය වියලි ලෙස තබා ගන්න.',
-    guidance_text_ta: 'கொள்கலனை உடனடியாக அகற்றி, நீர் தேங்குவதைத் தடுக்க பகுதி உலர வைக்கப்படுவதை உறுதிசெய்யவும்.',
-    remediation_action: 'remove_container',
-    is_dengue_risk: true,
-    additional_notes: 'Water accumulated in a plastic bucket behind the residential property.',
-  },
-  null,
-  2,
-);
+export const VISION_RESPONSE_SCHEMA_EXAMPLE = `{
+  "site_type": "plastic_container | drain | tyre | construction_water | flower_pot | roof_gutter | other",
+  "risk_level": "low | medium | high | critical",
+  "confidence_score": <number between 0.0 and 1.0>,
+  "breeding_indicators": [
+    "<observed_breeding_indicator_1>",
+    "<observed_breeding_indicator_2>"
+  ],
+  "guidance_text": "<Clear, actionable 1-3 sentence instruction in English for the field officer on what to do>",
+  "guidance_text_si": "<High-quality Sinhala translation of guidance_text>",
+  "guidance_text_ta": "<High-quality Tamil translation of guidance_text>",
+  "remediation_action": "drain_water | remove_container | apply_larvicide | cover_container | clear_drain | spray_insecticide | public_notice | other",
+  "is_dengue_risk": <boolean: true if there is any breeding site/larvae, false otherwise>,
+  "additional_notes": "<Optional: any additional observations or details>"
+}`;
