@@ -159,7 +159,7 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
                   setStep("result");
                 }
               })
-              .catch((err) => {
+              .catch(() => {
                 if (ac.signal.aborted) return;
                 setStep("confirm");
                 showToast({

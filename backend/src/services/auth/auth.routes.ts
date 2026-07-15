@@ -17,6 +17,7 @@ import {
   handleRefreshToken,
   handleRegisterStaff,
   handleGetMe,
+  handleGoogleLogin,
 } from './auth.controller';
 
 /**
@@ -56,6 +57,13 @@ authRouter.post(
   authRateLimiter,
   validate(loginSchema),
   handleLogin,
+);
+
+// Google OAuth login — community reporters
+authRouter.post(
+  '/google',
+  authRateLimiter,
+  handleGoogleLogin,
 );
 
 // Token refresh — any holder of a valid refresh token

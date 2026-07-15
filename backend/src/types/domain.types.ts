@@ -19,6 +19,7 @@ export interface User {
   is_active: boolean;
   language_preference: Language;
   assigned_zone_id: string | null;
+  google_oauth_id: string | null;
   created_at: Date;
   updated_at: Date;
 }

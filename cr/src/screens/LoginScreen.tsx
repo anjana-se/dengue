@@ -41,6 +41,74 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
 
   useEffect(() => () => void (resendTimer.current && clearInterval(resendTimer.current)), []);
 
+  useEffect(() => {
+    if (tab !== "google") return;
+
+    let active = true;
+
+    if (!document.getElementById("google-gsi-client")) {
+      const script = document.createElement("script");
+      script.id = "google-gsi-client";
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (active) {
+          initGoogleSignIn();
+        }
+      };
+      document.body.appendChild(script);
+    } else if ((window as any).google) {
+      initGoogleSignIn();
+    }
+
+    function initGoogleSignIn() {
+      const google = (window as any).google;
+      if (!google) return;
+      try {
+        const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || "816940104207-sfb2caonu3n5pq48dfrehovmag4mac5i.apps.googleusercontent.com";
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleCredentialResponse,
+        });
+
+        setTimeout(() => {
+          if (!active) return;
+          const btnParent = document.getElementById("google-signin-btn");
+          if (btnParent) {
+            google.accounts.id.renderButton(btnParent, {
+              theme: "outline",
+              size: "large",
+              width: btnParent.clientWidth || 340,
+              text: "signin_with",
+              shape: "rectangular",
+            });
+          }
+        }, 150);
+      } catch (err) {
+        console.error("Failed to initialize Google Sign-In:", err);
+      }
+    }
+
+    async function handleCredentialResponse(response: any) {
+      if (!active) return;
+      setLoading(true);
+      setError(null);
+      try {
+        await api.loginWithGoogle(response.credential);
+        onLogin();
+      } catch (err: any) {
+        setError(err.message || "Failed to log in with Google.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [tab, onLogin]);
+
   const sendCode = async () => {
     if (!email.trim() || !email.includes("@")) {
       setError("Please enter a valid email address.");
@@ -287,46 +355,19 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
       )}
 
       {tab === "google" && (
-        <div style={{ animation: "dgfade .3s ease" }}>
-          <button
-            type="button"
-            onClick={onLogin}
-            style={{
-              width: "100%",
-              height: 52,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 11,
-              border: "1.5px solid #dfe4e0",
-              borderRadius: 12,
-              background: "#fff",
-              fontSize: 16,
-              fontWeight: 600,
-              color: "#3c4043",
-              cursor: "pointer",
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-              <path
-                fill="#EA4335"
-                d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.8-6.8C35.6 2.4 30.1 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.5 13.3 17.7 9.5 24 9.5z"
-              />
-              <path
-                fill="#4285F4"
-                d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M10.5 28.4c-.5-1.4-.7-2.9-.7-4.4s.3-3 .7-4.4l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.6 10.6l7.9-6.2z"
-              />
-              <path
-                fill="#34A853"
-                d="M24 48c6.1 0 11.3-2 15-5.5l-7.1-5.5c-2 1.3-4.5 2.1-7.9 2.1-6.3 0-11.5-3.8-13.5-9.2l-7.9 6.2C6.5 42.6 14.6 48 24 48z"
-              />
-            </svg>
-            <span>{t("google_btn")}</span>
-          </button>
+        <div style={{ animation: "dgfade .3s ease", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {error && (
+            <p style={{ fontSize: 14, color: "#B91C1C", fontWeight: 500, marginBottom: 16, width: "100%", textAlign: "left" }}>
+              {error}
+            </p>
+          )}
+          {loading ? (
+            <div style={{ fontSize: 16, color: "#0D4A3E", fontWeight: 600, padding: "16px 0" }}>
+              Authenticating with Google...
+            </div>
+          ) : (
+            <div id="google-signin-btn" style={{ width: "100%", minHeight: 50, display: "flex", justifyContent: "center" }} />
+          )}
         </div>
       )}
 

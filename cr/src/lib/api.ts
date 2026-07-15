@@ -1,4 +1,4 @@
-import type { Report, ResolvedLocation, AnalysisResult } from "../types";
+import type { Report, ResolvedLocation } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
 
@@ -184,6 +184,21 @@ export const api = {
     }
 
     throw new Error("Invalid verification response");
+  },
+
+  async loginWithGoogle(idToken: string): Promise<{ success: boolean; user: UserProfile }> {
+    const res = await this.request("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ id_token: idToken }),
+    });
+
+    if (res.success && res.data?.access_token) {
+      const { access_token, refresh_token, user } = res.data;
+      this.setAuth({ access_token, refresh_token }, user);
+      return { success: true, user };
+    }
+
+    throw new Error("Invalid Google sign-in response");
   },
 
   // ─── ZONES ENDPOINTS ───────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import {
   refreshTokenService,
   registerStaffService,
   getMeService,
+  loginWithGoogleService,
 } from './auth.service';
 import type {
   RequestOtpInput,
@@ -101,6 +102,20 @@ export async function handleGetMe(
       return;
     }
     const result = await getMeService(userId);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGoogleLogin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id_token } = req.body;
+    const result = await loginWithGoogleService(id_token as string);
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     next(err);

@@ -3,6 +3,8 @@ import {
   findUserByEmail,
   createUser,
   updateLastLogin,
+  findUserByGoogleId,
+  updateUserGoogleId,
 } from '../../db/queries/users.queries';
 import { createOtp, verifyOtp } from './otp.store';
 import { sendOtpEmail } from '../../integrations/email/client';
@@ -19,6 +21,7 @@ import {
   ForbiddenError,
 } from '../../shared/httpErrors';
 import { logger } from '../../shared/logger';
+import { config } from '../../config/env';
 import { ROLES } from '../../config/constants';
 import type {
   RequestOtpInput,
@@ -230,4 +233,118 @@ export async function getMeService(userId: string) {
   const user = await findUserById(userId);
   if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
   return { user: sanitizeUser(user) };
+}
+
+// ─── Google OAuth login ──────────────────────────────────────────────────────
+
+interface GoogleTokenInfo {
+  iss?: string;
+  aud?: string;
+  sub?: string;
+  email?: string;
+  email_verified?: string | boolean;
+  name?: string;
+  error?: string;
+  error_description?: string;
+}
+
+export async function loginWithGoogleService(idToken: string) {
+  if (!idToken) {
+    throw new BadRequestError('Google ID token is required', 'MISSING_GOOGLE_TOKEN');
+  }
+
+  let tokenInfo: GoogleTokenInfo;
+  try {
+    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+    if (!res.ok) {
+      const errBody = await res.text();
+      logger.error('Google token verification failed', { status: res.status, body: errBody });
+      throw new UnauthorizedError('Invalid Google ID token', 'INVALID_GOOGLE_TOKEN');
+    }
+    tokenInfo = await res.json() as GoogleTokenInfo;
+  } catch (err) {
+    if (err instanceof UnauthorizedError || err instanceof BadRequestError) {
+      throw err;
+    }
+    logger.error('Failed to verify Google token', { error: (err as Error).message });
+    throw new UnauthorizedError('Google token verification failed', 'GOOGLE_VERIFICATION_FAILED');
+  }
+
+  if (tokenInfo.error) {
+    throw new UnauthorizedError(`Google token error: ${tokenInfo.error_description || tokenInfo.error}`, 'GOOGLE_TOKEN_ERROR');
+  }
+
+  // Validate audience and issuer
+  const clientId = config.GOOGLE_OAUTH_CLIENT_ID;
+  if (!clientId) {
+    logger.error('GOOGLE_OAUTH_CLIENT_ID is not configured in environment variables');
+    throw new ForbiddenError('Google OAuth is not configured on the server', 'OAUTH_NOT_CONFIGURED');
+  }
+
+  if (tokenInfo.aud !== clientId) {
+    logger.error('Google token aud mismatch', { expected: clientId, got: tokenInfo.aud });
+    throw new UnauthorizedError('Google token audience mismatch', 'GOOGLE_TOKEN_AUDIENCE_MISMATCH');
+  }
+
+  const issuer = tokenInfo.iss || '';
+  if (issuer !== 'accounts.google.com' && issuer !== 'https://accounts.google.com') {
+    logger.error('Google token iss mismatch', { got: issuer });
+    throw new UnauthorizedError('Google token issuer mismatch', 'GOOGLE_TOKEN_ISSUER_MISMATCH');
+  }
+
+  const isEmailVerified = tokenInfo.email_verified === 'true' || tokenInfo.email_verified === true;
+  if (!isEmailVerified) {
+    throw new UnauthorizedError('Google email is not verified', 'UNVERIFIED_GOOGLE_EMAIL');
+  }
+
+  const googleId = tokenInfo.sub;
+  const email = tokenInfo.email;
+  const name = tokenInfo.name || 'Google User';
+
+  if (!googleId || !email) {
+    throw new BadRequestError('Google token missing ID or email', 'INCOMPLETE_GOOGLE_TOKEN');
+  }
+
+  // Find user by Google ID or by email
+  let user = await findUserByGoogleId(googleId);
+
+  if (user) {
+    // Already linked, update last login
+    await updateLastLogin(user.id);
+  } else {
+    // Check if user exists by email
+    const existing = await findUserByEmail(email);
+    if (existing) {
+      // Link the Google ID to the existing account
+      await updateUserGoogleId(existing.id, googleId);
+      await updateLastLogin(existing.id);
+      user = {
+        ...existing,
+        google_oauth_id: googleId,
+      };
+    } else {
+      // Create new community reporter user
+      user = await createUser({
+        email,
+        full_name: name,
+        role: ROLES.COMMUNITY_REPORTER,
+        google_oauth_id: googleId,
+      });
+      logger.info('New community reporter registered via Google OAuth', { userId: user.id, email });
+    }
+  }
+
+  if (!user) {
+    throw new UnauthorizedError('User authentication failed', 'AUTH_FAILED');
+  }
+
+  if (!user.is_active) {
+    throw new ForbiddenError('User account is deactivated', 'USER_DEACTIVATED');
+  }
+
+  const tokens = buildTokenPair(user);
+  return {
+    ...tokens,
+    user: sanitizeUser(user),
+  };
 }

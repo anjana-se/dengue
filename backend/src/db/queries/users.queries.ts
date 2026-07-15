@@ -97,3 +97,10 @@ export async function deactivateUser(userId: string): Promise<void> {
     [userId],
   );
 }
+
+export async function updateUserGoogleId(userId: string, googleId: string): Promise<void> {
+  await query(
+    `UPDATE users SET google_oauth_id = $1, updated_at = NOW() WHERE id = $2`,
+    [googleId, userId],
+  );
+}
