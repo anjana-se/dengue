@@ -4,6 +4,7 @@ import {
   listReportsService,
   getReportByIdService,
   reviewReportService,
+  geocodeCoordinatesService,
 } from './reports.service';
 import type { CreateReportInput, ListReportsQuery, ReviewReportInput } from './reports.schemas';
 import { BadRequestError } from '../../shared/httpErrors';
@@ -92,6 +93,24 @@ export async function handleReviewReport(
       req.user!.sub,
     );
     res.status(200).json({ success: true, data: report });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGeocode(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const lat = req.query.lat ? Number(req.query.lat) : null;
+    const lng = req.query.lng ? Number(req.query.lng) : null;
+    if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+      throw new BadRequestError('Latitude and longitude are required query parameters', 'COORDINATES_REQUIRED');
+    }
+    const locationName = await geocodeCoordinatesService(lat, lng);
+    res.status(200).json({ success: true, name: locationName });
   } catch (err) {
     next(err);
   }

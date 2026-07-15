@@ -13,6 +13,7 @@ export interface CreateReportInput {
   drone_mission_id?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  location_name?: string | null;
   image_url: string;
   image_key?: string | null;
   notes?: string | null;
@@ -23,7 +24,7 @@ export async function createReport(input: CreateReportInput): Promise<Report> {
   const result = await query<Report>(
     `INSERT INTO reports (
        source_type, reporter_id, zone_id, drone_mission_id,
-       latitude, longitude, geom,
+       latitude, longitude, geom, location_name,
        image_url, image_key, status, notes
      )
      VALUES (
@@ -32,7 +33,7 @@ export async function createReport(input: CreateReportInput): Promise<Report> {
        CASE WHEN $5 IS NOT NULL AND $6 IS NOT NULL
             THEN ST_SetSRID(ST_MakePoint($6::double precision, $5::double precision), 4326)
             ELSE NULL END,
-       $7, $8, 'pending', $9
+       $7, $8, $9, 'pending', $10
      )
      RETURNING *`,
     [
@@ -42,6 +43,7 @@ export async function createReport(input: CreateReportInput): Promise<Report> {
       input.drone_mission_id ?? null,
       input.latitude ?? null,
       input.longitude ?? null,
+      input.location_name ?? null,
       input.image_url,
       input.image_key ?? null,
       input.notes ?? null,

@@ -28,6 +28,13 @@ export interface Report {
   days: number;
   /** Optional finer-grained age for same-day reports. */
   hours?: number;
+  /** Optional AI localized guidance text. */
+  guidanceText?: string;
+  /** Optional coordinates and image URL. */
+  latitude?: number;
+  longitude?: number;
+  imageUrl?: string;
+  createdAt?: string;
 }
 
 /** Result of analysing a captured photo. */

@@ -10,7 +10,7 @@ import { TooManyRequestsError } from '../shared/httpErrors';
 /** General API rate limiter — 200 requests per 15 minutes per IP */
 export const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req: Request, _res: Response, next: NextFunction) => {

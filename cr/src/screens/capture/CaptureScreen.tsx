@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { openCamera, stopStream, captureFrame, fileToDataUrl, type CameraError, type CameraErrorCode } from "../../lib/camera";
 import { resolveLocation } from "../../lib/geolocation";
-import { analyzePhoto } from "../../lib/analyze";
 import type { AnalysisResult, ResolvedLocation } from "../../types";
 import type { ToastState } from "../../components/Toast";
 import { PermissionStep } from "./PermissionStep";
@@ -11,6 +10,7 @@ import { ConfirmStep } from "./ConfirmStep";
 import { ProcessingStep } from "./ProcessingStep";
 import { ResultStep } from "./ResultStep";
 import { stepLabel, type CaptureStep, type GpsStatus } from "./types";
+import { api } from "../../lib/api";
 
 interface CaptureScreenProps {
   onStepChange: (step: CaptureStep) => void;
@@ -19,7 +19,7 @@ interface CaptureScreenProps {
 }
 
 export function CaptureScreen({ onStepChange, showToast, onViewReports }: CaptureScreenProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   const [step, setStep] = useState<CaptureStep>("permission");
   const [gps, setGps] = useState<GpsStatus>("idle");
@@ -27,12 +27,14 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
   const [photo, setPhoto] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [guidanceText, setGuidanceText] = useState<string | undefined>(undefined);
   const [cameraError, setCameraError] = useState<CameraErrorCode | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const geoAbort = useRef<AbortController | null>(null);
   const analyzeAbort = useRef<AbortController | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Report the current step up so App can hide/show the header & nav.
   useEffect(() => onStepChange(step), [step, onStepChange]);
@@ -68,6 +70,7 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
     () => () => {
       geoAbort.current?.abort();
       analyzeAbort.current?.abort();
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       stopStream(streamRef.current);
     },
     [],
@@ -128,30 +131,95 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
 
   const submitReport = useCallback(
     function submit() {
-      if (gps !== "confirmed") return;
+      if (gps !== "confirmed" || !location || !photo) return;
       setStep("processing");
       analyzeAbort.current?.abort();
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+
       const ac = new AbortController();
       analyzeAbort.current = ac;
-      analyzePhoto(photo ?? "", ac.signal)
-        .then((res) => {
-          if (!ac.signal.aborted) {
-            setAnalysis(res);
-            setStep("result");
+
+      api.submitReport(photo, location, description, lang)
+        .then((submitRes) => {
+          if (ac.signal.aborted) return;
+          const reportId = submitRes.report_id;
+
+          // If report is already analysed synchronously (Inngest bypassed)
+          if (submitRes.status !== "pending" && submitRes.status !== "processing") {
+            api.getReportDetails(reportId)
+              .then((repDetails) => {
+                if (ac.signal.aborted) return;
+                if (repDetails) {
+                  setAnalysis({
+                    risk: repDetails.risk,
+                    confidence: repDetails.confidence,
+                    siteType: repDetails.siteType,
+                  });
+                  setGuidanceText(repDetails.guidanceText);
+                  setStep("result");
+                }
+              })
+              .catch((err) => {
+                if (ac.signal.aborted) return;
+                setStep("confirm");
+                showToast({
+                  message: t("submit_failed"),
+                  kind: "error",
+                  actionLabel: t("try_again"),
+                  onAction: submit,
+                });
+              });
+            return;
           }
+
+          // Otherwise poll the status every 2 seconds
+          let attempts = 0;
+          pollIntervalRef.current = setInterval(() => {
+            attempts++;
+            if (attempts > 30) { // Limit polling to 60 seconds
+              if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+              setStep("confirm");
+              showToast({
+                message: "Analysis timed out. Please check your reports list.",
+                kind: "error",
+              });
+              return;
+            }
+
+            api.getReportDetails(reportId)
+              .then((repDetails) => {
+                if (ac.signal.aborted) {
+                  if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                  return;
+                }
+                if (repDetails && repDetails.status !== "processing") {
+                  if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                  setAnalysis({
+                    risk: repDetails.risk,
+                    confidence: repDetails.confidence,
+                    siteType: repDetails.siteType,
+                  });
+                  setGuidanceText(repDetails.guidanceText);
+                  setStep("result");
+                }
+              })
+              .catch((err) => {
+                console.error("Polling error:", err);
+              });
+          }, 2000);
         })
-        .catch((err: unknown) => {
-          if (ac.signal.aborted || (err as DOMException)?.name === "AbortError") return;
+        .catch((err) => {
+          if (ac.signal.aborted) return;
           setStep("confirm");
           showToast({
-            message: t("submit_failed"),
+            message: err.message || t("submit_failed"),
             kind: "error",
             actionLabel: t("try_again"),
             onAction: submit,
           });
         });
     },
-    [gps, photo, showToast, t],
+    [gps, location, photo, description, lang, showToast, t],
   );
 
   const reportAnother = () => {
@@ -161,6 +229,7 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
     setPhoto(null);
     setDescription("");
     setAnalysis(null);
+    setGuidanceText(undefined);
     setCameraError(null);
   };
 
@@ -196,5 +265,12 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
     );
   }
   if (step === "processing") return <ProcessingStep />;
-  return <ResultStep risk={analysis?.risk ?? "critical"} onReportAnother={reportAnother} onViewReports={onViewReports} />;
+  return (
+    <ResultStep
+      risk={analysis?.risk ?? "critical"}
+      guidanceText={guidanceText}
+      onReportAnother={reportAnother}
+      onViewReports={onViewReports}
+    />
+  );
 }

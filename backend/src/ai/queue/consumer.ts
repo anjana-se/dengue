@@ -4,7 +4,6 @@ import { config } from '../../config/env';
 import { QUEUE_NAMES, RISK_LEVELS } from '../../config/constants';
 import { logger } from '../../shared/logger';
 import { analyzeBreedingSiteImage } from '../../integrations/gemini/visionAnalysis';
-import { translateGuidanceTextBoth } from '../../integrations/gemini/translation';
 import { resizeImage, cleanupProcessedFile } from '../../imageProcessing/resize.util';
 import { updateReportAnalysis, updateReportStatus } from '../../db/queries/reports.queries';
 import { createWorkOrder } from '../../db/queries/workorders.queries';
@@ -82,13 +81,10 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
     const resized = await resizeImage(imagePath, { keepGps: false });
     processedImagePath = resized.outputPath;
 
-    // ── 4. Gemini vision analysis ──────────────────────────────────────────
+    // ── 4. Gemini vision analysis (includes translations inline) ───────────
     const analysis = await analyzeBreedingSiteImage(processedImagePath, 'image/jpeg');
 
-    // ── 5. Translate guidance text ─────────────────────────────────────────
-    const translations = await translateGuidanceTextBoth(analysis.guidance_text);
-
-    // ── 6 + 7. Persist analysis result ────────────────────────────────────
+    // ── 5 + 6. Persist analysis result ────────────────────────────────────
     const finalStatus = analysis.needs_human_review ? 'needs_human_review' : 'complete';
 
     const updatedReport = await updateReportAnalysis({
@@ -99,8 +95,8 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
       confidence_score: analysis.confidence_score,
       ai_analysis: { ...analysis, language },
       guidance_text: analysis.guidance_text,
-      guidance_text_si: translations.si || null,
-      guidance_text_ta: translations.ta || null,
+      guidance_text_si: analysis.guidance_text_si || null,
+      guidance_text_ta: analysis.guidance_text_ta || null,
       breeding_indicators: analysis.breeding_indicators,
       remediation_action: analysis.remediation_action,
     });
@@ -204,7 +200,7 @@ export function startWorker(): Worker<AiAnalysisJobData> {
     processJob,
     {
       connection: { url: config.REDIS_URL },
-      concurrency: 3,          // Process up to 3 jobs simultaneously
+      concurrency: 1,          // Process sequentially to prevent concurrent request spikes to Gemini
       limiter: {
         max: 10,
         duration: 60_000,       // Max 10 Gemini calls per minute (rate limiting)

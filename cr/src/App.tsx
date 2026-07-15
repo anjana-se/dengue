@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Header } from "./components/Header";
 import { BottomNav, type AppTab } from "./components/BottomNav";
 import { Toast, useToastController } from "./components/Toast";
@@ -9,15 +9,19 @@ import { ReportsScreen } from "./screens/ReportsScreen";
 import { HelpScreen } from "./screens/HelpScreen";
 import { CaptureScreen } from "./screens/capture/CaptureScreen";
 import type { CaptureStep } from "./screens/capture/types";
-import { MOCK_REPORTS } from "./lib/mock";
+import type { Report } from "./types";
+import { api } from "./lib/api";
 
 type Route = "welcome" | "login" | "app";
 
 export function App() {
-  const [route, setRoute] = useState<Route>("welcome");
+  const [route, setRoute] = useState<Route>(() => {
+    return api.isAuthenticated() ? "app" : "welcome";
+  });
   const [tab, setTab] = useState<AppTab>("report");
   const [captureStep, setCaptureStep] = useState<CaptureStep>("permission");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailReport, setDetailReport] = useState<Report | null>(null);
   const { toast, showToast } = useToastController();
 
   const onCaptureStep = useCallback((step: CaptureStep) => setCaptureStep(step), []);
@@ -34,6 +38,12 @@ export function App() {
     setTab("report");
     setCaptureStep("permission");
   }, []);
+  
+  const handleLogout = useCallback(() => {
+    api.logout();
+    setRoute("welcome");
+  }, []);
+
   const viewReports = useCallback(() => setTab("reports"), []);
 
   const isApp = route === "app";
@@ -41,10 +51,29 @@ export function App() {
   const showHeader = isApp && !(isReport && captureStep === "camera");
   const showNav = isApp && !(isReport && (captureStep === "camera" || captureStep === "processing"));
 
-  const detailReport = useMemo(
-    () => (detailId ? MOCK_REPORTS.find((r) => r.id === detailId) ?? null : null),
-    [detailId],
-  );
+  // Dynamically load detailed report when detailId changes
+  useEffect(() => {
+    if (!detailId) {
+      setDetailReport(null);
+      return;
+    }
+    let active = true;
+    api.getReportDetails(detailId)
+      .then((data) => {
+        if (active) {
+          setDetailReport(data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load report detail:", err);
+        if (active) {
+          showToast({ message: "Failed to load report details.", kind: "error" });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [detailId, showToast]);
 
   return (
     <div
@@ -69,7 +98,7 @@ export function App() {
           overflow: "hidden",
         }}
       >
-        {showHeader && <Header />}
+        {showHeader && <Header onLogout={handleLogout} />}
 
         <main style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           {route === "welcome" && <WelcomeScreen onGetStarted={goLogin} />}

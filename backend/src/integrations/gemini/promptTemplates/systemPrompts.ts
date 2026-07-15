@@ -41,7 +41,10 @@ RESPONSE INSTRUCTIONS:
 2. confidence_score must reflect your certainty that this is an Aedes breeding site (0.0 = no evidence, 1.0 = certain).
 3. breeding_indicators must list specific visual evidence you observed (e.g. "dark stagnant water", "mosquito larvae visible", "algae growth indicating prolonged stagnation").
 4. guidance_text must be a clear, actionable 1–3 sentence instruction in English for a field officer.
-5. If the image is too blurry, too dark, or clearly not a dengue-related site, set confidence_score below 0.5.
+5. guidance_text_si must be a high-quality translation of guidance_text in Sinhala (සිංහල).
+6. guidance_text_ta must be a high-quality translation of guidance_text in Tamil (தமிழ்).
+For both translations: Preserve technical terms (dengue, Aedes aegypti, larvae, larvicide) without translation, and use language appropriate for literate field officers.
+7. If the image is too blurry, too dark, or clearly not a dengue-related site, set confidence_score below 0.5.
 
 EXPECTED JSON SCHEMA:
 ${VISION_RESPONSE_SCHEMA_EXAMPLE}`;

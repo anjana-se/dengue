@@ -56,6 +56,7 @@ export interface Report {
   drone_mission_id: string | null;
   latitude: number | null;
   longitude: number | null;
+  location_name: string | null;
   image_url: string;
   status: ReportStatus;
   site_type: SiteType | null;

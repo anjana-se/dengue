@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { ReactNode } from "react";
 import { useI18n } from "../i18n/LanguageProvider";
 import { RiskBadge, StatusBadge } from "./Badges";
 import { SitePhotoArt } from "./icons";
@@ -66,11 +66,12 @@ export function DetailSheet({ report, onClose }: { report: Report; onClose: () =
     <div
       onClick={onClose}
       style={{
-        position: "absolute",
+        position: "fixed",
         inset: 0,
         background: "rgba(11,15,13,.42)",
-        zIndex: 50,
+        zIndex: 100,
         display: "flex",
+        justifyContent: "center",
         alignItems: "flex-end",
         animation: "dgfade .25s ease",
       }}
@@ -82,6 +83,7 @@ export function DetailSheet({ report, onClose }: { report: Report; onClose: () =
         aria-label={report.zone}
         style={{
           width: "100%",
+          maxWidth: 480,
           maxHeight: "88%",
           background: "#FAFAF8",
           borderRadius: "22px 22px 0 0",
@@ -106,7 +108,15 @@ export function DetailSheet({ report, onClose }: { report: Report; onClose: () =
             overflow: "hidden",
           }}
         >
-          <SitePhotoArt style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }} />
+          {report.imageUrl ? (
+            <img
+              src={report.imageUrl}
+              alt={report.zone}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            <SitePhotoArt style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }} />
+          )}
         </div>
 
         <div style={{ padding: "18px 20px 30px" }}>
@@ -115,6 +125,11 @@ export function DetailSheet({ report, onClose }: { report: Report; onClose: () =
             <StatusBadge status={report.status} size="md" />
           </div>
           <h2 style={{ margin: "0 0 3px", fontSize: 19, fontWeight: 700, color: "#0D4A3E" }}>{report.zone}</h2>
+          {report.latitude != null && report.longitude != null && (
+            <div style={{ fontSize: 12, color: "#8a978f", marginBottom: 6 }}>
+              {report.latitude.toFixed(6)}, {report.longitude.toFixed(6)}
+            </div>
+          )}
           <div style={{ fontSize: 13, color: "#8a978f", marginBottom: 18 }}>{timeAgo(report)}</div>
 
           <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
@@ -149,7 +164,7 @@ export function DetailSheet({ report, onClose }: { report: Report; onClose: () =
             >
               {t("guidance_label")}
             </div>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#33433c" }}>{GUIDE[report.risk]}</p>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#33433c" }}>{report.guidanceText || GUIDE[report.risk]}</p>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 11, padding: 14, background: wo.bg, borderRadius: 13 }}>

@@ -31,7 +31,9 @@ export function createApp() {
   const app = express();
 
   // ─── Core middleware ─────────────────────────────────────────────────────────
-  app.use(helmet());
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
   app.use(cors({ origin: corsOrigins, credentials: true }));
   app.use(morgan('combined', { stream: { write: (msg) => logger.http(msg.trim()) } }));
   app.use(express.json({ limit: '2mb' }));

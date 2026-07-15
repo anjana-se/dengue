@@ -19,7 +19,35 @@ export const MOCK_REPORTS: Report[] = [
  * Render a relative-time label for a report age.
  * Ported from the design's `timeAgo`, made locale-parameterised.
  */
-export function timeAgo(report: Pick<Report, "days" | "hours">, locale = "en-GB"): string {
+export function timeAgo(report: Pick<Report, "days" | "hours" | "createdAt">, locale = "en-GB"): string {
+  if (report.createdAt) {
+    const diffMs = Math.max(0, new Date().getTime() - new Date(report.createdAt).getTime());
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHr / 24);
+
+    if (diffSec < 60) {
+      if (diffSec <= 1) return "1 second ago";
+      return `${diffSec} seconds ago`;
+    }
+    if (diffMin < 60) {
+      if (diffMin === 1) return "1 minute ago";
+      return `${diffMin} minutes ago`;
+    }
+    if (diffHr < 24) {
+      if (diffHr === 1) return "1 hour ago";
+      return `${diffHr} hours ago`;
+    }
+    if (diffDays === 1) {
+      return "Yesterday";
+    }
+    if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    }
+    return new Date(report.createdAt).toLocaleDateString(locale, { day: "numeric", month: "short" });
+  }
+
   if (report.days === 0) {
     const h = report.hours ?? 1;
     return h === 1 ? "1 hour ago" : `${h} hours ago`;

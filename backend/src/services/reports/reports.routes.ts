@@ -14,6 +14,7 @@ import {
   handleListReports,
   handleGetReport,
   handleReviewReport,
+  handleGeocode,
 } from './reports.controller';
 
 /**
@@ -49,6 +50,13 @@ reportsRouter.get(
   requireRole('community_reporter', 'phi', 'ndcu_admin', 'drone_operator'),
   validate(listReportsSchema, 'query'),
   handleListReports,
+);
+
+// Geocode coordinates (proxies OSM Nominatim with a proper User-Agent)
+reportsRouter.get(
+  '/geocode',
+  requireRole('community_reporter', 'phi', 'ndcu_admin', 'drone_operator'),
+  handleGeocode,
 );
 
 // Get a single report

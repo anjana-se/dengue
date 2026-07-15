@@ -50,7 +50,7 @@ export async function analyzeBreedingSiteImage(
     ],
     generationConfig: {
       temperature: 0.1,       // Low temperature for consistent, factual JSON output
-      maxOutputTokens: 1024,
+      maxOutputTokens: 2048,
       responseMimeType: 'application/json',
     },
   });

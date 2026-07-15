@@ -70,23 +70,22 @@ export async function reverseGeocode(point: GeoPoint, signal?: AbortSignal): Pro
   const timer = setTimeout(() => ctrl.abort(), 6000);
   signal?.addEventListener("abort", () => ctrl.abort(), { once: true });
   try {
-    const url = new URL("https://nominatim.openstreetmap.org/reverse");
-    url.searchParams.set("format", "jsonv2");
-    url.searchParams.set("lat", String(point.lat));
-    url.searchParams.set("lon", String(point.lng));
-    url.searchParams.set("zoom", "16");
+    const token = localStorage.getItem("dg_access_token");
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
+    const url = `${API_BASE}/reports/geocode?lat=${point.lat}&lng=${point.lng}`;
+
     const res = await fetch(url, {
       signal: ctrl.signal,
-      headers: { Accept: "application/json" },
+      headers,
     });
     if (!res.ok) return fallback;
-    const data: { address?: Record<string, string>; name?: string } = await res.json();
-    const a = data.address ?? {};
-    const locality =
-      a.suburb || a.neighbourhood || a.village || a.town || a.city_district || a.city || data.name;
-    const region = a.city || a.state_district || a.state;
-    if (locality && region && locality !== region) return `${region} — ${locality}`;
-    return locality || region || fallback;
+    const payload = await res.json();
+    return payload.name || fallback;
   } catch {
     return fallback;
   } finally {

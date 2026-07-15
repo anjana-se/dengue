@@ -6,11 +6,12 @@ import type { RiskLevel } from "../../types";
 
 interface ResultStepProps {
   risk: RiskLevel;
+  guidanceText?: string;
   onReportAnother: () => void;
   onViewReports: () => void;
 }
 
-export function ResultStep({ risk, onReportAnother, onViewReports }: ResultStepProps) {
+export function ResultStep({ risk, guidanceText, onReportAnother, onViewReports }: ResultStepProps) {
   const { t } = useI18n();
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "28px 22px", animation: "dgfade .4s ease" }}>
@@ -44,7 +45,9 @@ export function ResultStep({ risk, onReportAnother, onViewReports }: ResultStepP
         >
           {t("guidance_label")}
         </div>
-        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: "#33433c" }}>{GUIDE[risk]}</p>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: "#33433c" }}>
+          {guidanceText || GUIDE[risk]}
+        </p>
       </div>
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>
         <button type="button" onClick={onReportAnother} style={heroButtonStyle("#65A30D", "0 6px 16px rgba(101,163,13,.26)")}>

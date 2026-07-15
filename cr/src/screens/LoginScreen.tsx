@@ -2,24 +2,21 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { useI18n } from "../i18n/LanguageProvider";
 import { Brand } from "../components/icons";
 import { ctaStyle } from "../components/ui";
+import { api } from "../lib/api";
 
 type LoginTab = "mobile" | "google";
 const OTP_LEN = 6;
 const RESEND_SECONDS = 60;
 
-/**
- * AUTH IS SIMULATED. The design has no auth backend, so:
- *  - "Send code" does not send a real SMS.
- *  - The OTP is validated client-side purely for the demo: any 6 digits log
- *    in, except "000000" which shows the error state.
- *  - Google is a stubbed one-tap.
- * PRODUCTION: issue + verify the OTP server-side, rate-limit sends, and use a
- * real OIDC flow for Google. Never trust client-side verification.
- */
 export function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<LoginTab>("mobile");
-  const [mobile, setMobile] = useState("");
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [needFullName, setNeedFullName] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [otpStage, setOtpStage] = useState(false);
   const [otp, setOtp] = useState<string[]>(Array(OTP_LEN).fill(""));
   const [otpError, setOtpError] = useState(false);
@@ -44,30 +41,59 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
 
   useEffect(() => () => void (resendTimer.current && clearInterval(resendTimer.current)), []);
 
-  const sendCode = () => {
-    if (mobile.length < 9) return;
-    setOtp(Array(OTP_LEN).fill(""));
-    setOtpError(false);
-    setOtpStage(true);
-    startResend();
-    setTimeout(() => otpRefs.current[0]?.focus(), 60);
+  const sendCode = async () => {
+    if (!email.trim() || !email.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    try {
+      await api.requestOtp(email.trim().toLowerCase(), needFullName ? fullName.trim() : undefined);
+      setOtp(Array(OTP_LEN).fill(""));
+      setOtpError(false);
+      setOtpStage(true);
+      startResend();
+      setTimeout(() => otpRefs.current[0]?.focus(), 60);
+    } catch (err: any) {
+      if (err.code === "FULL_NAME_REQUIRED") {
+        setNeedFullName(true);
+        setError("This is your first time. Please enter your name to register.");
+      } else {
+        setError(err.message || "Failed to send code. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const resendCode = () => {
+  const resendCode = async () => {
+    setError(null);
     setOtp(Array(OTP_LEN).fill(""));
     setOtpError(false);
-    startResend();
-    otpRefs.current[0]?.focus();
+    try {
+      await api.requestOtp(email.trim().toLowerCase(), needFullName ? fullName.trim() : undefined);
+      startResend();
+      otpRefs.current[0]?.focus();
+    } catch (err: any) {
+      setError(err.message || "Failed to resend code.");
+    }
   };
 
-  const verify = (code: string) => {
-    // Demo-only check — see the security note above.
-    if (code === "000000") {
+  const verify = async (code: string) => {
+    setError(null);
+    setLoading(true);
+    try {
+      await api.verifyOtp(email.trim().toLowerCase(), code);
+      onLogin();
+    } catch (err: any) {
       setOtpError(true);
       setOtp(Array(OTP_LEN).fill(""));
       otpRefs.current[0]?.focus();
-    } else {
-      onLogin();
+      setError(err.message || "Incorrect verification code.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -142,28 +168,37 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
           <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#3d4c46", marginBottom: 8 }}>
             {t("mobile_label")}
           </label>
-          <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                height: 52,
-                padding: "0 14px",
-                background: "#F0F2F0",
-                borderRadius: 12,
-                fontSize: 16,
-                fontWeight: 600,
-                color: "#0D4A3E",
-              }}
-            >
-              +94
+          
+          {needFullName && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#6b7a74", marginBottom: 6 }}>
+                Full Name (required for registration)
+              </label>
+              <input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="John Doe"
+                style={{
+                  width: "100%",
+                  height: 52,
+                  padding: "0 14px",
+                  border: "1.5px solid #dfe4e0",
+                  borderRadius: 12,
+                  fontSize: 16,
+                  color: "#1c2b26",
+                  outline: "none",
+                  background: "#fff",
+                }}
+              />
             </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
             <input
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 9))}
-              inputMode="numeric"
-              autoComplete="tel-national"
-              placeholder="77 123 4567"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="name@example.com"
               aria-label={t("mobile_label")}
               style={{
                 flex: 1,
@@ -178,8 +213,20 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
               }}
             />
           </div>
-          <button type="button" onClick={sendCode} disabled={mobile.length < 9} style={ctaStyle(mobile.length >= 9)}>
-            {t("send_code")}
+
+          {error && (
+            <p style={{ margin: "-8px 0 16px", fontSize: 14, color: needFullName ? "#0D4A3E" : "#B91C1C", fontWeight: 500 }}>
+              {error}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={sendCode}
+            disabled={loading || !email.trim() || (needFullName && !fullName.trim())}
+            style={ctaStyle(!loading && !!email.trim() && (!needFullName || !!fullName.trim()))}
+          >
+            {loading ? "Please wait..." : t("send_code")}
           </button>
         </div>
       )}
@@ -190,7 +237,7 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
             {t("verify_title")}
           </h2>
           <p style={{ margin: "0 0 22px", fontSize: 15, color: "#6b7a74", lineHeight: 1.4 }}>
-            {t("verify_body")} <b style={{ color: "#0D4A3E" }}>{`+94 ${mobile}`}</b>
+            {t("verify_body")} <b style={{ color: "#0D4A3E" }}>{email}</b>
           </p>
           <div style={{ display: "flex", gap: 9, marginBottom: 20 }}>
             {otp.map((v, i) => (
@@ -209,9 +256,9 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
               />
             ))}
           </div>
-          {otpError && (
+          {error && (
             <p style={{ margin: "-8px 0 16px", fontSize: 14, color: "#B91C1C", fontWeight: 500 }}>
-              {t("otp_error")}
+              {error}
             </p>
           )}
           <div style={{ textAlign: "center" }}>
@@ -219,6 +266,7 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
               <button
                 type="button"
                 onClick={resendCode}
+                disabled={loading}
                 style={{
                   background: "none",
                   border: "none",
@@ -226,6 +274,7 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
                   fontSize: 15,
                   fontWeight: 600,
                   cursor: "pointer",
+                  opacity: loading ? 0.5 : 1,
                 }}
               >
                 {t("resend_code")}

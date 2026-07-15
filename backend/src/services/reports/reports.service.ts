@@ -81,6 +81,12 @@ export async function createReportService(input: CreateReportServiceInput): Prom
 
   const uploadResult = await storage.upload(input.filePath, destKey, input.mimeType);
 
+  // ── Step 3.5: Geocode coordinates if no zone is assigned ─────────────────
+  let locationName: string | null = null;
+  if (!zoneId && latitude != null && longitude != null) {
+    locationName = await geocodeCoordinatesService(Number(latitude), Number(longitude));
+  }
+
   // ── Step 4: Insert report row ────────────────────────────────────────────
   const dbInput: DbCreateReportInput = {
     source_type: input.sourceType,
@@ -89,13 +95,14 @@ export async function createReportService(input: CreateReportServiceInput): Prom
     drone_mission_id: input.droneMissionId ?? null,
     latitude,
     longitude,
+    location_name: locationName,
     image_url: uploadResult.url,
     image_key: uploadResult.key,
     notes: input.notes ?? null,
   };
 
   const report = await dbCreateReport(dbInput);
-  logger.info('Report created', { reportId: report.id, source: input.sourceType, zoneId });
+  logger.info('Report created', { reportId: report.id, source: input.sourceType, zoneId, locationName });
 
   // ── Step 5: Enqueue AI analysis job ─────────────────────────────────────
   try {
@@ -179,4 +186,64 @@ export async function reviewReportService(
 
   logger.info('Report reviewed', { reportId, reviewedBy: reviewerUserId });
   return updated;
+}
+
+const geocodeCache = new Map<string, string>();
+const inflightGeocodes = new Map<string, Promise<string>>();
+
+export async function geocodeCoordinatesService(lat: number, lng: number): Promise<string> {
+  const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+  // 1. Check cache
+  if (geocodeCache.has(key)) {
+    return geocodeCache.get(key)!;
+  }
+
+  // 2. Check inflight promises (deduplication)
+  if (inflightGeocodes.has(key)) {
+    return inflightGeocodes.get(key)!;
+  }
+
+  const promise = (async () => {
+    const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    try {
+      const url = new URL('https://nominatim.openstreetmap.org/reverse');
+      url.searchParams.set('format', 'jsonv2');
+      url.searchParams.set('lat', String(lat));
+      url.searchParams.set('lon', String(lng));
+      url.searchParams.set('zoom', '16');
+
+      const res = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'DengueGuard-App/1.0.0 (contact: support@dengueguard.gov.lk)',
+        },
+      });
+
+      if (!res.ok) return fallback;
+      const data: any = await res.json();
+      const a = data.address ?? {};
+      const locality =
+        a.suburb || a.neighbourhood || a.village || a.town || a.city_district || a.city || data.name;
+      const region = a.city || a.state_district || a.state;
+      
+      let result = fallback;
+      if (locality && region && locality !== region) {
+        result = `${region} — ${locality}`;
+      } else if (locality || region) {
+        result = locality || region;
+      }
+
+      geocodeCache.set(key, result);
+      return result;
+    } catch (err) {
+      logger.warn('Failed to reverse geocode coordinates on backend proxy', { lat, lng, error: (err as Error).message });
+      return fallback;
+    } finally {
+      inflightGeocodes.delete(key);
+    }
+  })();
+
+  inflightGeocodes.set(key, promise);
+  return promise;
 }
