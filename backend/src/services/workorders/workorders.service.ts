@@ -13,6 +13,8 @@ import {
 } from '../notifications/notifications.service';
 import { computePriorityScore } from './priority.util';
 import { parsePaginationParams, buildPaginatedResult } from '../../shared/pagination.util';
+import { config } from '../../config/env';
+import { getStorage } from '../../storage';
 import {
   NotFoundError,
   BadRequestError,
@@ -27,6 +29,27 @@ import type {
   AssignWorkorderInput,
 } from './workorders.schemas';
 import type { RiskLevel } from '../../types/domain.types';
+import type { WorkOrderRow } from '../../db/queries/workorders.queries';
+
+export async function resolveWorkOrderImageUrl(wo: WorkOrderRow): Promise<WorkOrderRow> {
+  if (config.STORAGE_DRIVER === 's3' && wo.follow_up_image_key) {
+    const storage = getStorage();
+    try {
+      const freshUrl = await storage.getUrl(wo.follow_up_image_key);
+      return { ...wo, follow_up_image_url: freshUrl };
+    } catch (err: any) {
+      logger.warn('Failed to generate fresh signed URL for work order', { workOrderId: wo.id, error: err.message });
+    }
+  }
+  return wo;
+}
+
+export async function resolveWorkOrdersImageUrls(wos: WorkOrderRow[]): Promise<WorkOrderRow[]> {
+  if (config.STORAGE_DRIVER === 's3') {
+    return Promise.all(wos.map(resolveWorkOrderImageUrl));
+  }
+  return wos;
+}
 
 /**
  * services/workorders/workorders.service.ts
@@ -61,7 +84,8 @@ export async function listWorkordersService(
     offset,
   });
 
-  return buildPaginatedResult(rows, total, { page, limit, offset });
+  const resolvedRows = await resolveWorkOrdersImageUrls(rows);
+  return buildPaginatedResult(resolvedRows, total, { page, limit, offset });
 }
 
 // ─── Get by ID ────────────────────────────────────────────────────────────────
@@ -79,7 +103,7 @@ export async function getWorkorderByIdService(
     throw new NotFoundError(`Work order ${id} not found`, 'WORKORDER_NOT_FOUND');
   }
 
-  return wo;
+  return resolveWorkOrderImageUrl(wo);
 }
 
 // ─── Create (manual — NDCU admin) ────────────────────────────────────────────
@@ -145,7 +169,7 @@ export async function createWorkorderService(
     });
   }
 
-  return workOrder;
+  return resolveWorkOrderImageUrl(workOrder);
 }
 
 // ─── Accept (PHI) ─────────────────────────────────────────────────────────────
@@ -176,7 +200,7 @@ export async function acceptWorkorderService(
   });
 
   logger.info('Work order accepted', { workOrderId: id, assignedTo: acceptingUserId });
-  return updated;
+  return resolveWorkOrderImageUrl(updated);
 }
 
 // ─── Assign (NDCU admin) ──────────────────────────────────────────────────────
@@ -207,7 +231,7 @@ export async function assignWorkorderService(
   });
 
   logger.info('Work order assigned', { workOrderId: id, assignedTo: input.assigned_to });
-  return updated;
+  return resolveWorkOrderImageUrl(updated);
 }
 
 // ─── Resolve (PHI) ───────────────────────────────────────────────────────────
@@ -218,6 +242,7 @@ export async function resolveWorkorderService(
   resolvingUserId: string,
   resolvingUserRole: string,
   followUpImageUrl?: string,
+  followUpImageKey?: string,
 ) {
   if (!['phi', 'ndcu_admin'].includes(resolvingUserRole)) {
     throw new ForbiddenError('Only PHI officers and NDCU admins can resolve work orders', 'FORBIDDEN');
@@ -243,6 +268,7 @@ export async function resolveWorkorderService(
     resolved_at: new Date(),
     resolution_notes: input.resolution_notes,
     ...(followUpImageUrl ? { follow_up_image_url: followUpImageUrl } : {}),
+    ...(followUpImageKey ? { follow_up_image_key: followUpImageKey } : {}),
   });
 
   logger.info('Work order resolved', { workOrderId: id, resolvedBy: resolvingUserId });
@@ -287,7 +313,7 @@ export async function resolveWorkorderService(
     }
   }
 
-  return resolved;
+  return resolveWorkOrderImageUrl(resolved);
 }
 
 // ─── Cancel (NDCU admin) ──────────────────────────────────────────────────────
@@ -312,5 +338,5 @@ export async function cancelWorkorderService(
 
   const cancelled = await updateWorkOrderStatus(id, 'cancelled');
   logger.info('Work order cancelled', { workOrderId: id });
-  return cancelled;
+  return resolveWorkOrderImageUrl(cancelled);
 }

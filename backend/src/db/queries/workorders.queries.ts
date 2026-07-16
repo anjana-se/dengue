@@ -21,6 +21,7 @@ export interface WorkOrderRow {
   priority_score: number;
   remediation_action: string | null;
   follow_up_image_url: string | null;
+  follow_up_image_key: string | null;
   resolved_at: Date | null;
   resolution_notes: string | null;
   created_at: Date;
@@ -97,6 +98,7 @@ export async function updateWorkOrderStatus(
     resolved_at: Date;
     resolution_notes: string;
     follow_up_image_url: string;
+    follow_up_image_key: string;
   }> = {},
 ): Promise<WorkOrderRow> {
   const setClauses = ['status = $1', 'updated_at = NOW()'];
@@ -108,6 +110,7 @@ export async function updateWorkOrderStatus(
   if (updates.resolved_at !== undefined) { setClauses.push(`resolved_at = $${idx++}`); params.push(updates.resolved_at); }
   if (updates.resolution_notes !== undefined) { setClauses.push(`resolution_notes = $${idx++}`); params.push(updates.resolution_notes); }
   if (updates.follow_up_image_url !== undefined) { setClauses.push(`follow_up_image_url = $${idx++}`); params.push(updates.follow_up_image_url); }
+  if (updates.follow_up_image_key !== undefined) { setClauses.push(`follow_up_image_key = $${idx++}`); params.push(updates.follow_up_image_key); }
 
   params.push(id);
   const result = await query<WorkOrderRow>(

@@ -59,6 +59,7 @@ export interface Report {
   longitude: number | null;
   location_name: string | null;
   image_url: string;
+  image_key: string | null;
   status: ReportStatus;
   site_type: SiteType | null;
   risk_level: RiskLevel | null;
@@ -81,6 +82,7 @@ export interface WorkOrder {
   priority_score: number;
   remediation_action: string | null;
   follow_up_image_url: string | null;
+  follow_up_image_key: string | null;
   resolved_at: Date | null;
   resolution_notes: string | null;
   created_at: Date;

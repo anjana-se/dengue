@@ -90,11 +90,13 @@ export async function handleResolveWorkorder(
   try {
     // Optional follow-up image (proof of remediation)
     let followUpImageUrl: string | undefined;
+    let followUpImageKey: string | undefined;
     if (req.file) {
       const storage = getStorage();
       const destKey = `workorders/${String(req.params.id)}/followup-${Date.now()}.jpg`;
       const result = await storage.upload(req.file.path, destKey, req.file.mimetype);
       followUpImageUrl = result.url;
+      followUpImageKey = result.key;
     }
 
     const wo = await resolveWorkorderService(
@@ -103,6 +105,7 @@ export async function handleResolveWorkorder(
       req.user!.sub,
       req.user!.role,
       followUpImageUrl,
+      followUpImageKey,
     );
     res.status(200).json({ success: true, data: wo });
   } catch (err) { next(err); }

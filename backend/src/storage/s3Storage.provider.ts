@@ -27,18 +27,21 @@ export class S3StorageDriver implements StorageDriver {
     if (!config.S3_BUCKET) {
       throw new InternalServerError('S3_BUCKET env var is required when STORAGE_DRIVER=s3');
     }
-    if (!config.S3_ACCESS_KEY_ID || !config.S3_SECRET_ACCESS_KEY) {
-      throw new InternalServerError('S3 credentials (S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY) are required');
-    }
 
     this.bucket = config.S3_BUCKET;
-    this.client = new S3Client({
+
+    const clientConfig: any = {
       region: config.S3_REGION,
-      credentials: {
+    };
+
+    if (config.S3_ACCESS_KEY_ID && config.S3_SECRET_ACCESS_KEY) {
+      clientConfig.credentials = {
         accessKeyId: config.S3_ACCESS_KEY_ID,
         secretAccessKey: config.S3_SECRET_ACCESS_KEY,
-      },
-    });
+      };
+    }
+
+    this.client = new S3Client(clientConfig);
   }
 
   async upload(sourcePath: string, destKey: string, mimeType: string): Promise<UploadResult> {

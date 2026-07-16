@@ -10,6 +10,7 @@ import {
 import { findZoneByCoordinates } from '../../db/queries/zones.queries';
 import { extractGps, isWithinSriLanka } from './exif.util';
 import { getStorage } from '../../storage';
+import { config } from '../../config/env';
 import { logger } from '../../shared/logger';
 import { BadRequestError, NotFoundError } from '../../shared/httpErrors';
 import { parsePaginationParams, buildPaginatedResult } from '../../shared/pagination.util';
@@ -45,6 +46,26 @@ export interface CreateReportServiceInput extends CreateReportInput {
   sourceType: 'community' | 'drone';
   /** For drone images, preserve GPS in EXIF */
   isDroneImage?: boolean;
+}
+
+export async function resolveReportImageUrl(report: Report): Promise<Report> {
+  if (config.STORAGE_DRIVER === 's3' && report.image_key) {
+    const storage = getStorage();
+    try {
+      const freshUrl = await storage.getUrl(report.image_key);
+      return { ...report, image_url: freshUrl };
+    } catch (err: any) {
+      logger.warn('Failed to generate fresh signed URL for report', { reportId: report.id, error: err.message });
+    }
+  }
+  return report;
+}
+
+export async function resolveReportsImageUrls(reports: Report[]): Promise<Report[]> {
+  if (config.STORAGE_DRIVER === 's3') {
+    return Promise.all(reports.map(resolveReportImageUrl));
+  }
+  return reports;
 }
 
 export async function createReportService(input: CreateReportServiceInput): Promise<Report> {
@@ -122,7 +143,7 @@ export async function createReportService(input: CreateReportServiceInput): Prom
     });
   }
 
-  return report;
+  return resolveReportImageUrl(report);
 }
 
 // ─── List reports ─────────────────────────────────────────────────────────────
@@ -144,7 +165,8 @@ export async function listReportsService(query: ListReportsQuery, requestingUser
     offset,
   });
 
-  return buildPaginatedResult(rows, total, { page, limit, offset });
+  const resolvedRows = await resolveReportsImageUrls(rows);
+  return buildPaginatedResult(resolvedRows, total, { page, limit, offset });
 }
 
 // ─── Get report by ID ─────────────────────────────────────────────────────────
@@ -161,7 +183,7 @@ export async function getReportByIdService(reportId: string, requestingUserId: s
     throw new NotFoundError(`Report ${reportId} not found`, 'REPORT_NOT_FOUND');
   }
 
-  return report;
+  return resolveReportImageUrl(report);
 }
 
 // ─── Review report (PHI human review) ────────────────────────────────────────
@@ -185,7 +207,7 @@ export async function reviewReportService(
   const updated = await reviewReport(reportId, reviewerUserId, input.notes);
 
   logger.info('Report reviewed', { reportId, reviewedBy: reviewerUserId });
-  return updated;
+  return resolveReportImageUrl(updated);
 }
 
 const geocodeCache = new Map<string, string>();

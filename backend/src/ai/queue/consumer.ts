@@ -1,4 +1,6 @@
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 import { Worker, Job } from 'bullmq';
 import { config } from '../../config/env';
 import { QUEUE_NAMES, RISK_LEVELS } from '../../config/constants';
@@ -51,18 +53,41 @@ function computePriorityScore(
   return Math.round(base * confidenceScore);
 }
 
-async function resolveLocalImagePath(imageUrl: string): Promise<string> {
+async function resolveLocalImagePath(imageUrl: string): Promise<{ localPath: string; isTemp: boolean }> {
   // For local storage, imageUrl is http://localhost:PORT/uploads/...
   // Convert back to a filesystem path
   const uploadsUrl = `/uploads/`;
   const idx = imageUrl.indexOf(uploadsUrl);
   if (idx !== -1) {
     const relativePath = imageUrl.slice(idx + uploadsUrl.length);
-    return path.resolve(config.UPLOADS_DIR, relativePath);
+    return {
+      localPath: path.resolve(config.UPLOADS_DIR, relativePath),
+      isTemp: false,
+    };
   }
-  // For S3 or external URLs, return as-is (visionAnalysis handles URLs too)
-  // TODO: for S3 driver, download to temp file before processing
-  return imageUrl;
+
+  // For S3 or external URLs, download to a local temp file first
+  logger.info('Downloading S3/external image to local temp file...', { imageUrl });
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to download image from S3/external URL: ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const tempDir = os.tmpdir();
+  const tempPath = path.join(
+    tempDir,
+    `dengueguard-s3-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`
+  );
+
+  await fs.promises.writeFile(tempPath, buffer);
+  logger.debug('S3/external image downloaded to local temp path', { tempPath });
+
+  return {
+    localPath: tempPath,
+    isTemp: true,
+  };
 }
 
 async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
@@ -72,15 +97,16 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
   // ── 1. Mark as processing ────────────────────────────────────────────────
   await updateReportStatus(report_id, 'processing');
 
+  let resolvedImage: { localPath: string; isTemp: boolean } | null = null;
   let processedImagePath: string | null = null;
 
   try {
     // ── 2. Resolve image path ──────────────────────────────────────────────
-    const imagePath = await resolveLocalImagePath(image_url);
+    resolvedImage = await resolveLocalImagePath(image_url);
 
     // ── 3. Resize + strip EXIF ─────────────────────────────────────────────
     // Use 768px for the AI processing image (significantly speeds up VLM inference and prevents timeouts)
-    const resized = await resizeImage(imagePath, { keepGps: false, maxEdge: 768 });
+    const resized = await resizeImage(resolvedImage.localPath, { keepGps: false, maxEdge: 768 });
     processedImagePath = resized.outputPath;
 
     // ── 4. Vision analysis (dynamic provider selection) ───────────────────
@@ -187,6 +213,12 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
     // Always clean up the temp resized file
     if (processedImagePath) {
       await cleanupProcessedFile(processedImagePath);
+    }
+    // Clean up the downloaded S3 temp file if we created one
+    if (resolvedImage?.isTemp && resolvedImage.localPath) {
+      await fs.promises.unlink(resolvedImage.localPath).catch((e) => {
+        logger.warn('Failed to clean up downloaded S3 temp file', { path: resolvedImage?.localPath, error: e.message });
+      });
     }
   }
 }
