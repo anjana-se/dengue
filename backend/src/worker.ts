@@ -1,4 +1,5 @@
 import { logger } from './shared/logger';
+// Trigger reload for config update
 import { pool } from './db/client';
 import { startWorker, stopWorker } from './ai/queue/consumer';
 import { startZoneRiskRecomputeJob, stopZoneRiskRecomputeJob } from './jobs/zoneRiskRecompute.job';

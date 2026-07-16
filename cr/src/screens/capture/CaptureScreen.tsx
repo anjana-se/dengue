@@ -28,6 +28,8 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
   const [description, setDescription] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [guidanceText, setGuidanceText] = useState<string | undefined>(undefined);
+  const [guidanceTextSi, setGuidanceTextSi] = useState<string | undefined>(undefined);
+  const [guidanceTextTa, setGuidanceTextTa] = useState<string | undefined>(undefined);
   const [cameraError, setCameraError] = useState<CameraErrorCode | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -156,6 +158,8 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
                     siteType: repDetails.siteType,
                   });
                   setGuidanceText(repDetails.guidanceText);
+                  setGuidanceTextSi(repDetails.guidanceTextSi);
+                  setGuidanceTextTa(repDetails.guidanceTextTa);
                   setStep("result");
                 }
               })
@@ -200,6 +204,8 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
                     siteType: repDetails.siteType,
                   });
                   setGuidanceText(repDetails.guidanceText);
+                  setGuidanceTextSi(repDetails.guidanceTextSi);
+                  setGuidanceTextTa(repDetails.guidanceTextTa);
                   setStep("result");
                 }
               })
@@ -230,6 +236,8 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
     setDescription("");
     setAnalysis(null);
     setGuidanceText(undefined);
+    setGuidanceTextSi(undefined);
+    setGuidanceTextTa(undefined);
     setCameraError(null);
   };
 
@@ -269,6 +277,8 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
     <ResultStep
       risk={analysis?.risk ?? "critical"}
       guidanceText={guidanceText}
+      guidanceTextSi={guidanceTextSi}
+      guidanceTextTa={guidanceTextTa}
       onReportAnother={reportAnother}
       onViewReports={onViewReports}
     />

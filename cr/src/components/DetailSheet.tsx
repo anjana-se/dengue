@@ -59,7 +59,7 @@ function workOrder(status: ReportStatus, T: (k: StringKey) => string): WorkOrder
 }
 
 export function DetailSheet({ report, onClose }: { report: Report; onClose: () => void }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const wo = workOrder(report.status, t);
 
   return (
@@ -164,7 +164,9 @@ export function DetailSheet({ report, onClose }: { report: Report; onClose: () =
             >
               {t("guidance_label")}
             </div>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#33433c" }}>{report.guidanceText || GUIDE[report.risk]}</p>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#33433c" }}>
+              {(lang === "si" ? report.guidanceTextSi : lang === "ta" ? report.guidanceTextTa : report.guidanceText) || report.guidanceText || GUIDE[report.risk]}
+            </p>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 11, padding: 14, background: wo.bg, borderRadius: 13 }}>
