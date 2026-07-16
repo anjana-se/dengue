@@ -19,6 +19,8 @@ const MAX_LONGEST_EDGE = 1920;
 export interface ResizeOptions {
   /** If true, GPS EXIF data is preserved (drone images). Default: false */
   keepGps?: boolean;
+  /** Max longest edge in pixels. Default: 1920 */
+  maxEdge?: number;
 }
 
 export interface ResizeResult {
@@ -38,7 +40,7 @@ export async function resizeImage(
   inputPath: string,
   options: ResizeOptions = {},
 ): Promise<ResizeResult> {
-  const { keepGps = false } = options;
+  const { keepGps = false, maxEdge = MAX_LONGEST_EDGE } = options;
 
   const ext = path.extname(inputPath);
   const base = inputPath.slice(0, -ext.length);
@@ -61,11 +63,11 @@ export async function resizeImage(
     pipeline = sharp(inputPath);
 
     // Resize only if the image exceeds the max edge length
-    wasResized = longestEdge > MAX_LONGEST_EDGE;
+    wasResized = longestEdge > maxEdge;
     if (wasResized) {
       pipeline = pipeline.resize({
-        width: origWidth >= origHeight ? MAX_LONGEST_EDGE : undefined,
-        height: origHeight > origWidth ? MAX_LONGEST_EDGE : undefined,
+        width: origWidth >= origHeight ? maxEdge : undefined,
+        height: origHeight > origWidth ? maxEdge : undefined,
         fit: 'inside',
         withoutEnlargement: true,
       });

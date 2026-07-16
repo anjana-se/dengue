@@ -36,6 +36,11 @@ const envSchema = z.object({
   GEMINI_TRANSLATION_MODEL: z.string().default('gemini-2.0-flash-lite'),
   AI_ANALYSIS_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.7),
 
+  // NVIDIA AI (for vision)
+  AI_PROVIDER: z.enum(['gemini', 'nvidia']).default('gemini'),
+  NVIDIA_API_KEY: z.string().optional(),
+  NVIDIA_VISION_MODEL: z.string().optional(),
+
   // Storage
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   UPLOADS_DIR: z.string().default('./uploads'),

@@ -3,7 +3,7 @@ import { Worker, Job } from 'bullmq';
 import { config } from '../../config/env';
 import { QUEUE_NAMES, RISK_LEVELS } from '../../config/constants';
 import { logger } from '../../shared/logger';
-import { analyzeBreedingSiteImage } from '../../integrations/gemini/visionAnalysis';
+import { analyzeBreedingSiteImage } from '../../integrations/visionAnalysis';
 import { resizeImage, cleanupProcessedFile } from '../../imageProcessing/resize.util';
 import { updateReportAnalysis, updateReportStatus } from '../../db/queries/reports.queries';
 import { createWorkOrder } from '../../db/queries/workorders.queries';
@@ -78,7 +78,8 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
     const imagePath = await resolveLocalImagePath(image_url);
 
     // ── 3. Resize + strip EXIF ─────────────────────────────────────────────
-    const resized = await resizeImage(imagePath, { keepGps: false });
+    // Use 768px for the AI processing image (significantly speeds up VLM inference and prevents timeouts)
+    const resized = await resizeImage(imagePath, { keepGps: false, maxEdge: 768 });
     processedImagePath = resized.outputPath;
 
     // ── 4. Gemini vision analysis (includes translations inline) ───────────
