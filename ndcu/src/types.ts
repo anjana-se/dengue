@@ -27,6 +27,9 @@ export interface Zone {
   open_orders: number;
   /** Polygon ring. */
   c: LatLng[];
+  meta_name?: string;
+  meta_district?: string;
+  meta_province?: string;
 }
 
 export interface AiAnalysis {

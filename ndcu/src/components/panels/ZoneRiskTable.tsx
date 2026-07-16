@@ -8,10 +8,24 @@ export default function ZoneRiskTable() {
   const zones = useStore((s) => s.zones);
   const selectZone = useStore((s) => s.selectZone);
 
+  const sorted = [...zones].sort((a, b) => b.risk_score - a.risk_score);
+
+  if (sorted.length === 0) {
+    return (
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8e5', padding: '20px 16px' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Zone Risk Ranking</div>
+        <div style={{ fontSize: 13, color: '#94a29d', textAlign: 'center', padding: '12px 0' }}>
+          Loading zone data…
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8e5', overflow: 'hidden' }}>
-      <div style={{ padding: '13px 16px', borderBottom: '1px solid #eef1f0', fontSize: 15, fontWeight: 600 }}>
-        Zone Risk Ranking
+      <div style={{ padding: '13px 16px', borderBottom: '1px solid #eef1f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 15, fontWeight: 600 }}>Zone Risk Ranking</span>
+        <span style={{ fontSize: 11, color: '#94a29d' }}>click to inspect on map</span>
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
@@ -24,13 +38,14 @@ export default function ZoneRiskTable() {
           </tr>
         </thead>
         <tbody>
-          {zones.map((z) => {
+          {sorted.map((z) => {
             const r = RISK[z.risk_level] || RISK.low;
             return (
               <tr
                 key={z.zone_id}
                 onClick={() => selectZone(z)}
                 style={{ cursor: 'pointer', borderTop: '1px solid #f2f5f4' }}
+                title={`Click to highlight ${z.name} on the map`}
               >
                 <td style={{ padding: '9px 16px', fontWeight: 600 }}>{z.name}</td>
                 <td style={{ padding: '9px 16px' }}>
@@ -45,7 +60,11 @@ export default function ZoneRiskTable() {
                   </div>
                 </td>
                 <td style={{ padding: '9px 16px', textAlign: 'right' }}>{z.active_report_count}</td>
-                <td style={{ padding: '9px 16px', textAlign: 'right' }}>{z.open_orders}</td>
+                <td style={{ padding: '9px 16px', textAlign: 'right' }}>
+                  <span style={{ color: z.open_orders > 0 ? '#EF4444' : '#94a29d', fontWeight: z.open_orders > 0 ? 700 : 400 }}>
+                    {z.open_orders}
+                  </span>
+                </td>
               </tr>
             );
           })}

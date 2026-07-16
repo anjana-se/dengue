@@ -14,14 +14,14 @@ import type {
 export const CENTER: LatLng = [6.9271, 79.8612];
 
 export const ZONES: Zone[] = [
-  { zone_id: 'Z1', name: 'Colombo Fort', risk_score: 88, risk_level: 'critical', active_report_count: 14, open_orders: 6, c: [[6.94, 79.842], [6.94, 79.856], [6.93, 79.856], [6.93, 79.842]] },
-  { zone_id: 'Z2', name: 'Pettah', risk_score: 81, risk_level: 'critical', active_report_count: 11, open_orders: 5, c: [[6.94, 79.856], [6.94, 79.87], [6.93, 79.87], [6.93, 79.856]] },
-  { zone_id: 'Z3', name: 'Maradana', risk_score: 67, risk_level: 'high', active_report_count: 8, open_orders: 3, c: [[6.93, 79.856], [6.93, 79.872], [6.92, 79.872], [6.92, 79.856]] },
-  { zone_id: 'Z4', name: 'Slave Island', risk_score: 59, risk_level: 'high', active_report_count: 6, open_orders: 2, c: [[6.93, 79.842], [6.93, 79.856], [6.92, 79.856], [6.92, 79.842]] },
-  { zone_id: 'Z5', name: 'Kollupitiya', risk_score: 44, risk_level: 'medium', active_report_count: 4, open_orders: 1, c: [[6.92, 79.84], [6.92, 79.856], [6.908, 79.856], [6.908, 79.84]] },
-  { zone_id: 'Z6', name: 'Borella', risk_score: 38, risk_level: 'medium', active_report_count: 3, open_orders: 1, c: [[6.92, 79.87], [6.92, 79.886], [6.908, 79.886], [6.908, 79.87]] },
-  { zone_id: 'Z7', name: 'Bambalapitiya', risk_score: 22, risk_level: 'low', active_report_count: 1, open_orders: 0, c: [[6.908, 79.848], [6.908, 79.864], [6.895, 79.864], [6.895, 79.848]] },
-  { zone_id: 'Z8', name: 'Wellawatte', risk_score: 17, risk_level: 'low', active_report_count: 1, open_orders: 0, c: [[6.895, 79.85], [6.895, 79.866], [6.882, 79.866], [6.882, 79.85]] },
+  { zone_id: '00000000-0000-0000-0000-000000000001', name: 'Colombo Fort', risk_score: 88, risk_level: 'critical', active_report_count: 14, open_orders: 6, c: [[6.94, 79.842], [6.94, 79.856], [6.93, 79.856], [6.93, 79.842]] },
+  { zone_id: '00000000-0000-0000-0000-000000000002', name: 'Pettah', risk_score: 81, risk_level: 'critical', active_report_count: 11, open_orders: 5, c: [[6.94, 79.856], [6.94, 79.87], [6.93, 79.87], [6.93, 79.856]] },
+  { zone_id: '00000000-0000-0000-0000-000000000003', name: 'Maradana', risk_score: 67, risk_level: 'high', active_report_count: 8, open_orders: 3, c: [[6.93, 79.856], [6.93, 79.872], [6.92, 79.872], [6.92, 79.856]] },
+  { zone_id: '00000000-0000-0000-0000-000000000004', name: 'Slave Island', risk_score: 59, risk_level: 'high', active_report_count: 6, open_orders: 2, c: [[6.93, 79.842], [6.93, 79.856], [6.92, 79.856], [6.92, 79.842]] },
+  { zone_id: '00000000-0000-0000-0000-000000000005', name: 'Kollupitiya', risk_score: 44, risk_level: 'medium', active_report_count: 4, open_orders: 1, c: [[6.92, 79.84], [6.92, 79.856], [6.908, 79.856], [6.908, 79.84]] },
+  { zone_id: '00000000-0000-0000-0000-000000000006', name: 'Borella', risk_score: 38, risk_level: 'medium', active_report_count: 3, open_orders: 1, c: [[6.92, 79.87], [6.92, 79.886], [6.908, 79.886], [6.908, 79.87]] },
+  { zone_id: '00000000-0000-0000-0000-000000000007', name: 'Bambalapitiya', risk_score: 22, risk_level: 'low', active_report_count: 1, open_orders: 0, c: [[6.908, 79.848], [6.908, 79.864], [6.895, 79.864], [6.895, 79.848]] },
+  { zone_id: '00000000-0000-0000-0000-000000000008', name: 'Wellawatte', risk_score: 17, risk_level: 'low', active_report_count: 1, open_orders: 0, c: [[6.895, 79.85], [6.895, 79.866], [6.882, 79.866], [6.882, 79.85]] },
 ];
 
 export const SITES: string[] = [
@@ -43,10 +43,10 @@ export const PHIS: Phi[] = [
 ];
 
 export const RECS: Recommendation[] = [
-  { rank: 1, zone_id: 'Z1', zone_name: 'Colombo Fort', action: 'Deploy 2 teams for source reduction sweep', reasoning: '14 active reports in 24h, 6 with visible larvae. Risk score up 12 points since yesterday.', confidence: 94, suggested_teams: 2 },
-  { rank: 2, zone_id: 'Z2', zone_name: 'Pettah', action: 'Priority larviciding of market drainage', reasoning: 'Dense reporting cluster around market. Blocked-drain site type dominant.', confidence: 89, suggested_teams: 2 },
-  { rank: 3, zone_id: 'Z3', zone_name: 'Maradana', action: 'Community awareness + tyre collection', reasoning: 'Recurring discarded-tyre reports; upward trend over 3 days.', confidence: 81, suggested_teams: 1 },
-  { rank: 4, zone_id: 'Z4', zone_name: 'Slave Island', action: 'Inspect construction sites', reasoning: 'Two large construction lots with standing water flagged by drone survey.', confidence: 76, suggested_teams: 1 },
+  { rank: 1, zone_id: '00000000-0000-0000-0000-000000000001', zone_name: 'Colombo Fort', action: 'Deploy 2 teams for source reduction sweep', reasoning: '14 active reports in 24h, 6 with visible larvae. Risk score up 12 points since yesterday.', confidence: 94, suggested_teams: 2 },
+  { rank: 2, zone_id: '00000000-0000-0000-0000-000000000002', zone_name: 'Pettah', action: 'Priority larviciding of market drainage', reasoning: 'Dense reporting cluster around market. Blocked-drain site type dominant.', confidence: 89, suggested_teams: 2 },
+  { rank: 3, zone_id: '00000000-0000-0000-0000-000000000003', zone_name: 'Maradana', action: 'Community awareness + tyre collection', reasoning: 'Recurring discarded-tyre reports; upward trend over 3 days.', confidence: 81, suggested_teams: 1 },
+  { rank: 4, zone_id: '00000000-0000-0000-0000-000000000004', zone_name: 'Slave Island', action: 'Inspect construction sites', reasoning: 'Two large construction lots with standing water flagged by drone survey.', confidence: 76, suggested_teams: 1 },
 ];
 
 // ---------- Dengue cases (patient GIS layer) ----------
@@ -102,14 +102,14 @@ export const WEATHER: Weather = {
 type PredTune = [number, RiskTrend, AlertLevel];
 
 const PRED_TUNE: Record<string, PredTune> = {
-  Z1: [0.91, 'rising', 'emergency'],
-  Z2: [0.83, 'rising', 'warning'],
-  Z3: [0.78, 'rising', 'warning'],
-  Z4: [0.63, 'stable', 'watch'],
-  Z5: [0.55, 'stable', 'watch'],
-  Z6: [0.47, 'falling', 'watch'],
-  Z7: [0.3, 'falling', 'watch'],
-  Z8: [0.22, 'stable', 'watch'],
+  '00000000-0000-0000-0000-000000000001': [0.91, 'rising', 'emergency'],
+  '00000000-0000-0000-0000-000000000002': [0.83, 'rising', 'warning'],
+  '00000000-0000-0000-0000-000000000003': [0.78, 'rising', 'warning'],
+  '00000000-0000-0000-0000-000000000004': [0.63, 'stable', 'watch'],
+  '00000000-0000-0000-0000-000000000005': [0.55, 'stable', 'watch'],
+  '00000000-0000-0000-0000-000000000006': [0.47, 'falling', 'watch'],
+  '00000000-0000-0000-0000-000000000007': [0.3, 'falling', 'watch'],
+  '00000000-0000-0000-0000-000000000008': [0.22, 'stable', 'watch'],
 };
 
 export const PREDICTIONS: Prediction[] = ZONES.map((z) => {

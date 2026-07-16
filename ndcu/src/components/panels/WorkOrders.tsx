@@ -22,6 +22,19 @@ function Pill({ status }: { status: WorkOrderStatus }) {
 
 const HEADERS = ['Priority', 'Zone', 'Site type', 'Assigned', 'Status', 'Created', ''];
 
+function isPointInPolygon(pt: [number, number], poly: [number, number][]) {
+  const x = pt[0], y = pt[1];
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    const intersect = ((yi > y) !== (yj > y))
+      && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 export default function WorkOrders() {
   const orders = useStore((s) => s.orders);
   const role = useStore((s) => s.role);
@@ -29,11 +42,21 @@ export default function WorkOrders() {
   const setDispatchOrder = useStore((s) => s.setDispatchOrder);
   const resolveWO = useStore((s) => s.resolveWO);
   const acceptWO = useStore((s) => s.acceptWO);
+  const selZone = useStore((s) => s.selZone);
+  const selectZone = useStore((s) => s.selectZone);
 
   const [filter, setFilter] = useState<'all' | 'new' | 'assigned' | 'in_progress' | 'resolved'>('all');
 
   const filtered = [...orders]
     .filter((o) => filter === 'all' || o.status === filter)
+    .filter((o) => {
+      if (!selZone) return true;
+      if (o.zone_id === selZone.zone_id) return true;
+      if (selZone.c && selZone.c.length > 0) {
+        return isPointInPolygon([o.lat, o.lng], selZone.c as any);
+      }
+      return false;
+    })
     .sort((a, b) => b.priority_score - a.priority_score);
 
   return (
@@ -50,8 +73,40 @@ export default function WorkOrders() {
       }}
     >
       {/* Header */}
-      <div style={{ padding: '13px 16px', borderBottom: '1px solid #eef1f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 15, fontWeight: 600 }}>Work Orders</span>
+      <div
+        style={{
+          padding: '13px 16px',
+          borderBottom: '1px solid #eef1f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
+          flexWrap: 'wrap',
+          background: selZone ? '#EFF6FF' : '#fff',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>Work Orders</span>
+          {selZone && (
+            <span
+              onClick={() => selectZone(null)}
+              style={{
+                fontSize: 12,
+                background: '#2563EB',
+                color: '#fff',
+                padding: '2px 8px',
+                borderRadius: 12,
+                cursor: 'pointer',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              Zone: {selZone.meta_name || selZone.name} ✕
+            </span>
+          )}
+        </div>
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: 6 }}>
@@ -76,7 +131,7 @@ export default function WorkOrders() {
           ))}
         </div>
 
-        <span style={{ fontSize: 12, color: '#94a29d' }}>{filtered.length} orders</span>
+        <span style={{ fontSize: 12, color: '#94a29d', fontWeight: 600 }}>{filtered.length} orders</span>
       </div>
 
       {/* Table */}

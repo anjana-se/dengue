@@ -9,13 +9,137 @@ import type {
 } from 'leaflet';
 import L from '../../lib/leaflet';
 import { CASE_SEV, PRED_BAND, RISK } from '../../theme';
-import { CENTER, PREDICTIONS, ZONES } from '../../data/zones';
+import { CENTER, PREDICTIONS } from '../../data/zones';
 import { filteredCases } from '../../utils/cases';
 import { casePopupHTML } from './casePopup';
 import { useStore } from '../../store/useStore';
-import type { Report, WorkOrder } from '../../types';
+import type { Report, WorkOrder, Zone } from '../../types';
 
 const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const NSDI_SERVICE = 'https://gisapps.nsdi.gov.lk/server/rest/services/Srilanka/Boundaries/MapServer';
+
+// Ray-casting algorithm to check if point falls within polygon boundary
+function isPointInPolygon(pt: [number, number], poly: [number, number][]) {
+  const x = pt[0], y = pt[1];
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    const intersect = ((yi > y) !== (yj > y))
+      && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// JSONP helper to query Esri MapServer bypassing CORS
+function jsonp(url: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const cbName = '__nsdi_cb_' + Math.floor(Math.random() * 1000000);
+    const script = document.createElement('script');
+    let settled = false;
+
+    (window as any)[cbName] = (data: any) => {
+      if (settled) return;
+      settled = true;
+      try { delete (window as any)[cbName]; } catch { }
+      script.remove();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      script.remove();
+      reject(new Error('Boundary service lookup failed'));
+    };
+
+    const sep = url.includes('?') ? '&' : '?';
+    script.src = `${url}${sep}callback=${cbName}`;
+    document.body.appendChild(script);
+
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      script.remove();
+      reject(new Error('Boundary service lookup timed out'));
+    }, 12000);
+  });
+}
+
+interface BoundaryInfo {
+  coords: [number, number][][];
+  name: string;
+  district?: string;
+  province?: string;
+}
+
+// Fetch boundary geometry and attributes from official Survey Department / NSDI server
+async function fetchBoundaryGeometry(lat: number, lng: number, layerId: number): Promise<BoundaryInfo | null> {
+  const geom = `${lng},${lat}`;
+  const url = `${NSDI_SERVICE}/identify`
+    + `?geometry=${geom}`
+    + `&geometryType=esriGeometryPoint`
+    + `&sr=4326`
+    + `&layers=all:${layerId}`
+    + `&tolerance=8`
+    + `&mapExtent=${lng - 0.015},${lat - 0.015},${lng + 0.015},${lat + 0.015}`
+    + `&imageDisplay=800,600,96`
+    + `&returnGeometry=true`
+    + `&f=json`;
+
+  try {
+    const res = await jsonp(url);
+    if (res && res.results && res.results.length > 0) {
+      const feature = res.results[0];
+      const geometry = feature.geometry;
+      const attrs = feature.attributes || {};
+      if (geometry && geometry.rings && geometry.rings.length > 0) {
+        const coords = geometry.rings.map((ring: [number, number][]) =>
+          ring.map((pt: [number, number]) => [pt[1], pt[0]] as [number, number])
+        );
+        const name = attrs.gnd_name || attrs.ds_division_name || attrs.district_name || attrs.province_name || feature.value || 'Unknown';
+        const district = attrs.district_name || attrs.District_Name;
+        const province = attrs.province_name || attrs.Province_Name;
+
+        return { coords, name, district, province };
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to query boundary coordinates for layer', layerId, e);
+  }
+  return null;
+}
+
+// Get dynamic styling properties based on Zoom level and Case count
+function getZoneStyle(zoom: number, caseCount: number) {
+  // Safe-to-risk color scale (green to red):
+  // 0-2 cases: Safe/Low (Green)
+  // 3-5 cases: Medium (Yellow)
+  // 6-10 cases: High (Orange)
+  // > 10 cases: Critical (Red)
+  const fillCol = caseCount > 10 ? '#EF4444' : caseCount > 5 ? '#F97316' : caseCount > 2 ? '#EAB308' : '#10B981';
+  const borderCol = caseCount > 10 ? '#991B1B' : caseCount > 5 ? '#C2410C' : caseCount > 2 ? '#854D0E' : '#065F46';
+
+  // Adjust style properties (stroke weight, opacity) based on Zoom level
+  let weight = 1.5;
+  let fillOpacity = 0.10;
+
+  if (zoom <= 10) {
+    weight = 2.5;
+    fillOpacity = 0.20;
+  } else if (zoom <= 13) {
+    weight = 2.0;
+    fillOpacity = 0.15;
+  }
+
+  return {
+    color: borderCol,
+    weight,
+    fillColor: fillCol,
+    fillOpacity,
+  };
+}
 
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -29,6 +153,11 @@ export default function MapView() {
   const pulseTimerRef = useRef<number | null>(null);
 
   const [ready, setReady] = useState(false);
+  const [zoom, setZoom] = useState(13); // Local map zoom level state
+
+  // Cache to store boundary polygons and attributes retrieved from the Survey Department MapServer
+  // Format: { [zone_id]: { [layerId]: BoundaryInfo } }
+  const [boundaryCache, setBoundaryCache] = useState<Record<string, Record<number, BoundaryInfo>>>({});
 
   // Store slices the map reacts to.
   const view = useStore((s) => s.view);
@@ -59,6 +188,13 @@ export default function MapView() {
     caseLayerRef.current = null;
     caseIsClusterRef.current = false;
     setReady(true);
+
+    // Zoom listener to trigger state-based styling recomputes
+    const onZoom = () => {
+      setZoom(map.getZoom());
+    };
+    map.on('zoomend', onZoom);
+
     const t = window.setTimeout(() => map.invalidateSize(), 120);
     return () => {
       window.clearTimeout(t);
@@ -66,6 +202,7 @@ export default function MapView() {
         clearInterval(pulseTimerRef.current);
         pulseTimerRef.current = null;
       }
+      map.off('zoomend', onZoom);
       map.remove();
       mapRef.current = null;
       caseLayerRef.current = null;
@@ -74,19 +211,90 @@ export default function MapView() {
     };
   }, []);
 
+  // ---- Fetch Real Boundary Geometries from NSDI MapServer ----
+  useEffect(() => {
+    if (!ready || zones.length === 0) return;
+
+    const loadBoundaries = async () => {
+      const cache: Record<string, Record<number, BoundaryInfo>> = {};
+
+      for (const z of zones) {
+        const lat = z.c[0][0];
+        const lng = z.c[0][1];
+        cache[z.zone_id] = {};
+
+        // Fetch GN Division boundary (Layer 1)
+        const gnGeom = await fetchBoundaryGeometry(lat, lng, 1);
+        if (gnGeom) cache[z.zone_id][1] = gnGeom;
+
+        // Fetch District boundary (Layer 3)
+        const distGeom = await fetchBoundaryGeometry(lat, lng, 3);
+        if (distGeom) cache[z.zone_id][3] = distGeom;
+
+        // Fetch Province boundary (Layer 4)
+        const provGeom = await fetchBoundaryGeometry(lat, lng, 4);
+        if (provGeom) cache[z.zone_id][4] = provGeom;
+      }
+
+      setBoundaryCache(cache);
+    };
+
+    loadBoundaries();
+  }, [ready, zones]);
+
   // ---- zones ----
   useEffect(() => {
     const g = zoneLayerRef.current;
     if (!ready || !g) return;
     g.clearLayers();
     if (!layers.zones) return;
+
     zones.forEach((z) => {
-      const col = RISK[z.risk_level]?.c || '#94a29d';
-      const poly = L.polygon(z.c, { color: col, weight: 1.5, fillColor: col, fillOpacity: 0.32 }).addTo(g);
-      poly.on('click', () => selectZone(z));
-      poly.bindTooltip(z.name + ' · ' + z.risk_score, { sticky: true, direction: 'top' });
+      let coords: [number, number][][] | [number, number][] = z.c;
+      let isFallback = true;
+      let cachedInfo: BoundaryInfo | null = null;
+
+      // Select active layer ID based on current zoom level
+      const activeLayerId = zoom <= 10 ? 4 : zoom <= 13 ? 3 : 1;
+      const cached = boundaryCache[z.zone_id]?.[activeLayerId];
+      if (cached) {
+        coords = cached.coords;
+        cachedInfo = cached;
+        isFallback = false;
+      }
+
+      // Calculate active cases inside the boundary geometry
+      const caseCount = cases.filter((c) => {
+        if (!isFallback) {
+          // Check containment inside outer ring of dynamic boundary
+          return isPointInPolygon([c.lat, c.lng], (coords as [number, number][][])[0]);
+        }
+        return isPointInPolygon([c.lat, c.lng], z.c);
+      }).length;
+
+      const style = getZoneStyle(zoom, caseCount);
+
+      // If fallback rectangular box, make it fully transparent (removing boxes from map)
+      const poly = L.polygon(coords as any, {
+        color: isFallback ? 'transparent' : style.color,
+        weight: isFallback ? 0 : style.weight,
+        fillColor: isFallback ? 'transparent' : style.fillColor,
+        fillOpacity: isFallback ? 0 : style.fillOpacity,
+      }).addTo(g);
+
+      poly.on('click', () => {
+        selectZone({
+          ...z,
+          meta_name: cachedInfo?.name || z.name,
+          meta_district: cachedInfo?.district || 'Colombo',
+          meta_province: cachedInfo?.province || 'Western',
+          // Pass the outer ring coordinates as the zone's coordinates so spatial checks match it
+          c: cachedInfo?.coords ? (cachedInfo.coords[0] as any) : z.c,
+        });
+      });
+      poly.bindTooltip((cachedInfo?.name || z.name) + ' · ' + caseCount + ' cases', { sticky: true, direction: 'top' });
     });
-  }, [ready, layers.zones, zones, selectZone]);
+  }, [ready, layers.zones, zones, cases, zoom, boundaryCache, selectZone]);
 
   // ---- report / work-order pins ----
   useEffect(() => {
@@ -95,7 +303,6 @@ export default function MapView() {
     g.clearLayers();
     const isWO = view === 'workorders';
     const pool: Array<Report | WorkOrder> = isWO ? orders : reports;
-    // Work orders always show their pins; reports are gated by the "Breeding site reports" toggle.
     if (!isWO && layers.community === false) return;
     pool.forEach((r) => {
       const col = RISK[r.risk_level].c;
@@ -167,19 +374,19 @@ export default function MapView() {
       if (caseLayerRef.current && map.hasLayer(caseLayerRef.current)) map.removeLayer(caseLayerRef.current);
       caseLayerRef.current = canCluster
         ? L.markerClusterGroup({
-            maxClusterRadius: 50,
-            iconCreateFunction: (cl: MarkerCluster) => {
-              const n = cl.getChildCount();
-              const t = Math.min(1, n / 25);
-              const col = t < 0.4 ? '#3B82F6' : t < 0.7 ? '#F59E0B' : '#DC2626';
-              const sz = n < 10 ? 34 : n < 25 ? 42 : 50;
-              return L.divIcon({
-                html: `<div class="dg-cluster" style="width:${sz}px;height:${sz}px;background:${col};font-size:${n > 99 ? 12 : 14}px">${n}</div>`,
-                className: '',
-                iconSize: [sz, sz],
-              });
-            },
-          })
+          maxClusterRadius: 50,
+          iconCreateFunction: (cl: MarkerCluster) => {
+            const n = cl.getChildCount();
+            const t = Math.min(1, n / 25);
+            const col = t < 0.4 ? '#3B82F6' : t < 0.7 ? '#F59E0B' : '#DC2626';
+            const sz = n < 10 ? 34 : n < 25 ? 42 : 50;
+            return L.divIcon({
+              html: `<div class="dg-cluster" style="width:${sz}px;height:${sz}px;background:${col};font-size:${n > 99 ? 12 : 14}px">${n}</div>`,
+              className: '',
+              iconSize: [sz, sz],
+            });
+          },
+        })
         : L.layerGroup();
       caseIsClusterRef.current = canCluster;
     }
@@ -227,5 +434,102 @@ export default function MapView() {
     return () => window.clearTimeout(id);
   }, [ready, view]);
 
-  return <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />;
+  // Get active tier details for the legend overlay
+  const getActiveTier = () => {
+    const rungs = [
+      { label: '0-2 cases (Low)', color: '#10B981' },
+      { label: '3-5 cases (Medium)', color: '#EAB308' },
+      { label: '6-10 cases (High)', color: '#F97316' },
+      { label: '> 10 cases (Critical)', color: '#EF4444' },
+    ];
+
+    if (zoom <= 10) {
+      return {
+        name: 'Province Level',
+        desc: 'Broad regional distribution',
+        color: '#EF4444',
+        rungs,
+      };
+    }
+    if (zoom <= 13) {
+      return {
+        name: 'District Level',
+        desc: 'Sub-district outbreak clusters',
+        color: '#F97316',
+        rungs,
+      };
+    }
+    return {
+      name: 'Grama Niladhari Level',
+      desc: 'High-resolution local targeting',
+      color: '#10B981',
+      rungs,
+    };
+  };
+
+  const tier = getActiveTier();
+
+  return (
+    <div style={{ position: 'absolute', inset: 0 }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Floating Legend Panel - Syncs dynamically with active zoom tier in bottom-right */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 24,
+          right: 24,
+          zIndex: 1000,
+          background: '#12211f',
+          color: '#eef6f4',
+          borderRadius: 12,
+          padding: '10px 14px',
+          width: 250,
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          backdropFilter: 'blur(8px)',
+          pointerEvents: 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: tier.color,
+                boxShadow: `0 0 0 2px ${tier.color}33`,
+              }}
+            />
+            <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.2px' }}>{tier.name}</span>
+          </div>
+          <span style={{ fontSize: 9.5, color: '#9fb3af' }}>Zoom: {zoom}</span>
+        </div>
+
+        {/* Linear color scale bar */}
+        <div style={{ display: 'flex', alignItems: 'stretch', height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+          {tier.rungs.map((r, i) => (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                background: r.color,
+                marginRight: i === tier.rungs.length - 1 ? 0 : 1,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Labels under scale bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#9fb3af' }}>
+          <span>0-2 (Low)</span>
+          <span>3-5 (Med)</span>
+          <span>6-10 (High)</span>
+          <span>&gt;10 (Crit)</span>
+        </div>
+      </div>
+    </div>
+  );
 }
