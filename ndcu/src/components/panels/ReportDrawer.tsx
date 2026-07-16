@@ -1,0 +1,179 @@
+import { PRIMARY, RISK } from '../../theme';
+import { timf } from '../../utils/format';
+import { useStore } from '../../store/useStore';
+import Badge from '../common/Badge';
+import Drawer from '../common/Drawer';
+
+export default function ReportDrawer() {
+  const r = useStore((s) => s.activeReport);
+  const orders = useStore((s) => s.orders);
+  const setActiveReport = useStore((s) => s.setActiveReport);
+  const createWO = useStore((s) => s.createWO);
+  const toast = useStore((s) => s.toast);
+  if (!r) return null;
+
+  const rk = RISK[r.risk_level];
+  const hasWO = orders.some((o) => o.zone_id === r.zone_id && o.site_type === r.site_type);
+
+  const facts: [string, string][] = [
+    ['Site type', r.site_type],
+    ['Water present', r.ai_analysis.water_present ? 'Yes' : 'No'],
+    ['Larvae visible', r.larvae_visible ? 'Yes ⚠' : 'No'],
+    ['Source', r.source_type],
+  ];
+
+  return (
+    <Drawer title={'Report ' + r.report_id} onClose={() => setActiveReport(null)}>
+      <div
+        style={{
+          height: 190,
+          borderRadius: 12,
+          background: 'linear-gradient(135deg,#cddbd6,#b3c9c2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 44,
+          color: '#7c968e',
+          marginBottom: 16,
+        }}
+      >
+        {r.source_type === 'drone' ? '✈' : '📷'}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ fontSize: 18, fontWeight: 700 }}>{r.site_type}</span>
+        <Badge level={r.risk_level} />
+      </div>
+      <div style={{ fontSize: 13, color: '#6b7c77', marginBottom: 16 }}>
+        {r.zone_name} · {r.lat.toFixed(4)}, {r.lng.toFixed(4)} · {timf(r.created_at)}
+      </div>
+
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: '#94a29d',
+          textTransform: 'uppercase',
+          letterSpacing: '.06em',
+          marginBottom: 9,
+        }}
+      >
+        AI Analysis
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
+          <span style={{ color: '#6b7c77' }}>Confidence</span>
+          <span style={{ fontWeight: 700, color: PRIMARY }}>{r.confidence}%</span>
+        </div>
+        <div style={{ height: 7, background: '#eef1f0', borderRadius: 5, overflow: 'hidden' }}>
+          <div style={{ width: r.confidence + '%', height: '100%', background: PRIMARY }} />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+        {facts.map(([k, v]) => (
+          <div key={k} style={{ background: '#f4f7f6', borderRadius: 8, padding: '8px 11px' }}>
+            <div style={{ fontSize: 11, color: '#94a29d' }}>{k}</div>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0f2d27', marginTop: 1 }}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          background: rk.bg,
+          borderLeft: '3px solid ' + rk.c,
+          borderRadius: 8,
+          padding: '11px 13px',
+          marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: rk.c,
+            textTransform: 'uppercase',
+            letterSpacing: '.04em',
+            marginBottom: 4,
+          }}
+        >
+          Field Guidance
+        </div>
+        <div style={{ fontSize: 13, color: '#334b45', lineHeight: 1.5 }}>{r.guidance_text}</div>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#94a29d',
+            textTransform: 'uppercase',
+            letterSpacing: '.06em',
+            marginBottom: 5,
+          }}
+        >
+          Reasoning
+        </div>
+        <div style={{ fontSize: 12.5, color: '#6b7c77', lineHeight: 1.55 }}>{r.ai_analysis.reasoning}</div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        {hasWO ? (
+          <div
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              padding: '11px',
+              background: '#E7F7F0',
+              color: '#0b6b57',
+              borderRadius: 9,
+              fontSize: 13.5,
+              fontWeight: 600,
+            }}
+          >
+            ✓ Work order exists
+          </div>
+        ) : (
+          <button
+            onClick={() => createWO(r)}
+            style={{
+              flex: 1,
+              padding: '11px',
+              border: 'none',
+              borderRadius: 9,
+              background: PRIMARY,
+              color: '#fff',
+              cursor: 'pointer',
+              fontFamily: 'Inter',
+              fontSize: 13.5,
+              fontWeight: 600,
+            }}
+          >
+            Create work order
+          </button>
+        )}
+        <button
+          onClick={() => {
+            toast('Flagged for human review', 'info');
+            setActiveReport(null);
+          }}
+          style={{
+            padding: '11px 15px',
+            border: '1px solid #d5ddda',
+            borderRadius: 9,
+            background: '#fff',
+            color: '#334b45',
+            cursor: 'pointer',
+            fontFamily: 'Inter',
+            fontSize: 13.5,
+            fontWeight: 600,
+          }}
+        >
+          Flag for review
+        </button>
+      </div>
+    </Drawer>
+  );
+}

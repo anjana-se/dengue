@@ -1,0 +1,26 @@
+import 'leaflet';
+
+// leaflet.heat has no bundled types — declare the module and augment L.heatLayer.
+declare module 'leaflet.heat';
+
+declare module 'leaflet' {
+  interface HeatLayerOptions {
+    minOpacity?: number;
+    maxZoom?: number;
+    max?: number;
+    radius?: number;
+    blur?: number;
+    gradient?: Record<number, string>;
+  }
+
+  interface HeatLayer extends Layer {
+    setLatLngs(latlngs: Array<[number, number, number?]>): this;
+    addLatLng(latlng: [number, number, number?]): this;
+    setOptions(options: HeatLayerOptions): this;
+  }
+
+  function heatLayer(
+    latlngs: Array<[number, number, number?]>,
+    options?: HeatLayerOptions,
+  ): HeatLayer;
+}
