@@ -18,6 +18,8 @@ import {
   handleRegisterStaff,
   handleGetMe,
   handleGoogleLogin,
+  handleListStaff,
+  handleUpdateStaff,
 } from './auth.controller';
 
 /**
@@ -87,4 +89,20 @@ authRouter.get(
   '/me',
   authenticate,
   handleGetMe,
+);
+
+// List all staff users — ndcu_admin only
+authRouter.get(
+  '/staff',
+  authenticate,
+  requireRole('ndcu_admin'),
+  handleListStaff,
+);
+
+// Update a staff user — ndcu_admin only
+authRouter.patch(
+  '/staff/:id',
+  authenticate,
+  requireRole('ndcu_admin'),
+  handleUpdateStaff,
 );

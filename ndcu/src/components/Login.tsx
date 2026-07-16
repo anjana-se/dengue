@@ -1,52 +1,43 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { PRIMARY } from '../theme';
 import { useStore } from '../store/useStore';
-import type { Role } from '../types';
 
-const fieldStyle: CSSProperties = {
+const inputStyle: CSSProperties = {
   width: '100%',
-  padding: '11px 13px',
-  border: '1px solid #d5ddda',
-  borderRadius: 8,
+  padding: '12px 14px',
+  border: '1.5px solid #d5ddda',
+  borderRadius: 9,
   fontSize: 15,
-  fontFamily: 'Inter',
-  marginBottom: 12,
+  fontFamily: 'Inter, system-ui, sans-serif',
+  marginBottom: 14,
   outline: 'none',
+  transition: 'border-color .2s',
+  boxSizing: 'border-box',
 };
 
-function Field({ placeholder, type = 'text' }: { placeholder: string; type?: string }) {
-  return <input type={type} placeholder={placeholder} style={fieldStyle} />;
-}
-
 export default function Login() {
-  const loginTab = useStore((s) => s.loginTab);
-  const setLoginTab = useStore((s) => s.setLoginTab);
   const login = useStore((s) => s.login);
+  const loading = useStore((s) => s.loading);
 
-  const roleBtn = (role: Role, lbl: string, sub: string) => (
-    <button
-      key={role}
-      onClick={() => login(role)}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        gap: 2,
-        width: '100%',
-        padding: '11px 14px',
-        marginBottom: 8,
-        border: '1px solid #d5ddda',
-        borderRadius: 8,
-        background: '#fff',
-        cursor: 'pointer',
-        textAlign: 'left',
-        fontFamily: 'Inter',
-      }}
-    >
-      <span style={{ fontSize: 14, fontWeight: 600, color: PRIMARY }}>{lbl}</span>
-      <span style={{ fontSize: 12, color: '#6b7c77' }}>{sub}</span>
-    </button>
-  );
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!email.trim()) { setError('Email is required'); return; }
+    if (!password) { setError('Password is required'); return; }
+    setSubmitting(true);
+    try {
+      await login(email.trim(), password);
+    } catch (err: any) {
+      setError(err.message || 'Invalid credentials. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div
@@ -55,107 +46,132 @@ export default function Login() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg,#0D4A3E,#0a3830)',
+        background: 'linear-gradient(135deg, #0D4A3E 0%, #0a3830 60%, #071f1b 100%)',
       }}
     >
-      <div
+      {/* Decorative blobs */}
+      <div style={{ position: 'fixed', top: -120, right: -80, width: 500, height: 500, borderRadius: '50%', background: 'rgba(16,185,129,.08)', pointerEvents: 'none' }} />
+      <div style={{ position: 'fixed', bottom: -80, left: -60, width: 400, height: 400, borderRadius: '50%', background: 'rgba(16,185,129,.06)', pointerEvents: 'none' }} />
+
+      <form
+        onSubmit={handleSubmit}
         style={{
-          width: 400,
+          width: 420,
           background: '#fff',
-          borderRadius: 16,
-          padding: '34px 32px',
-          boxShadow: '0 24px 60px rgba(0,0,0,.35)',
+          borderRadius: 18,
+          padding: '38px 36px',
+          boxShadow: '0 32px 80px rgba(0,0,0,.4)',
           animation: 'dg-in .4s',
+          position: 'relative',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
           <div
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 9,
-              background: PRIMARY,
+              width: 40,
+              height: 40,
+              borderRadius: 11,
+              background: `linear-gradient(135deg, ${PRIMARY}, #0a4f3f)`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#fff',
-              fontWeight: 700,
-              fontSize: 18,
+              fontWeight: 800,
+              fontSize: 20,
+              boxShadow: '0 4px 12px rgba(13,74,62,.4)',
             }}
           >
             D
           </div>
-          <span style={{ fontSize: 21, fontWeight: 700, color: PRIMARY, letterSpacing: '-.02em' }}>
-            DengueGuard
-          </span>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: PRIMARY, letterSpacing: '-.03em', lineHeight: 1.1 }}>
+              DengueGuard
+            </div>
+            <div style={{ fontSize: 11.5, color: '#7fb0a4', fontWeight: 500, letterSpacing: '.01em' }}>
+              Operations Portal
+            </div>
+          </div>
         </div>
-        <p style={{ margin: '0 0 22px 44px', fontSize: 13, color: '#6b7c77', marginTop: -2 }}>
-          Urban dengue surveillance for Sri Lanka
+
+        <p style={{ margin: '0 0 26px', fontSize: 13, color: '#6b7c77' }}>
+          Urban dengue surveillance &amp; response · Sri Lanka
         </p>
 
-        <div
+        {/* Fields */}
+        <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#334b45', marginBottom: 6 }}>
+          Email address
+        </label>
+        <input
+          id="login-email"
+          type="email"
+          autoComplete="email"
+          placeholder="officer@ndcu.gov.lk"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={submitting}
           style={{
-            display: 'flex',
-            gap: 4,
-            background: '#f0f3f2',
-            padding: 4,
-            borderRadius: 9,
-            marginBottom: 18,
+            ...inputStyle,
+            borderColor: error && !email ? '#ef4444' : '#d5ddda',
           }}
-        >
-          {(['email', 'otp'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setLoginTab(t)}
-              style={{
-                flex: 1,
-                padding: '8px',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontFamily: 'Inter',
-                fontSize: 13,
-                fontWeight: 600,
-                background: loginTab === t ? '#fff' : 'transparent',
-                color: loginTab === t ? PRIMARY : '#6b7c77',
-                boxShadow: loginTab === t ? '0 1px 2px rgba(0,0,0,.08)' : 'none',
-              }}
-            >
-              {t === 'email' ? 'Email login' : 'OTP login'}
-            </button>
-          ))}
-        </div>
+        />
 
-        {loginTab === 'email' ? (
-          <div>
-            <Field placeholder="officer@ndcu.gov.lk" type="email" />
-            <Field placeholder="Password" type="password" />
-          </div>
-        ) : (
-          <div>
-            <Field placeholder="Mobile number  +94" type="tel" />
-            <div style={{ fontSize: 12, color: '#6b7c77', marginBottom: 12 }}>
-              We'll send a 6-digit verification code.
-            </div>
+        <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#334b45', marginBottom: 6 }}>
+          Password
+        </label>
+        <input
+          id="login-password"
+          type="password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={submitting}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e as any); }}
+          style={{
+            ...inputStyle,
+            marginBottom: 6,
+            borderColor: error && !password ? '#ef4444' : '#d5ddda',
+          }}
+        />
+
+        {error && (
+          <div style={{ fontSize: 12.5, color: '#c0392b', marginBottom: 14, background: '#fef2f2', padding: '9px 12px', borderRadius: 7, border: '1px solid #fecaca' }}>
+            {error}
           </div>
         )}
 
-        <div
+        <button
+          id="login-submit"
+          type="submit"
+          disabled={submitting || loading}
           style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#94a29d',
-            textTransform: 'uppercase',
-            letterSpacing: '.06em',
-            margin: '6px 0 8px',
+            width: '100%',
+            padding: '13px',
+            border: 'none',
+            borderRadius: 10,
+            background: submitting || loading
+              ? '#7fb0a4'
+              : `linear-gradient(135deg, ${PRIMARY}, #0a4f3f)`,
+            color: '#fff',
+            cursor: submitting || loading ? 'default' : 'pointer',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 15,
+            fontWeight: 700,
+            letterSpacing: '.01em',
+            boxShadow: submitting || loading ? 'none' : '0 4px 16px rgba(13,74,62,.35)',
+            transition: 'all .2s',
+            marginTop: 4,
           }}
         >
-          Sign in as
+          {submitting || loading ? 'Signing in…' : 'Sign in'}
+        </button>
+
+        <div style={{ marginTop: 22, paddingTop: 16, borderTop: '1px solid #eef1f0', fontSize: 12, color: '#94a29d', textAlign: 'center', lineHeight: 1.6 }}>
+          Access is restricted to authorised NDCU staff.<br />
+          Contact your administrator if you need an account.
         </div>
-        {roleBtn('ndcu_admin', 'NDCU Admin', 'Dashboard, dispatch & oversight')}
-        {roleBtn('phi', 'PHI Field Officer', 'Assigned work orders')}
-        {roleBtn('drone_operator', 'Drone Operator', 'Mission uploads')}
-      </div>
+      </form>
     </div>
   );
 }

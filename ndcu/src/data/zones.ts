@@ -35,11 +35,11 @@ export const SITES: string[] = [
 ];
 
 export const PHIS: Phi[] = [
-  { user_id: 'U1', name: 'S. Fernando' },
-  { user_id: 'U2', name: 'K. Perera' },
-  { user_id: 'U3', name: 'M. Silva' },
-  { user_id: 'U4', name: 'A. Jayasuriya' },
-  { user_id: 'U5', name: 'R. Wickrama' },
+  { user_id: '00000000-0000-0000-0001-000000000002', name: 'S. Fernando' },
+  { user_id: '00000000-0000-0000-0001-000000000004', name: 'K. Perera' },
+  { user_id: '00000000-0000-0000-0001-000000000005', name: 'M. Silva' },
+  { user_id: '00000000-0000-0000-0001-000000000006', name: 'A. Jayasuriya' },
+  { user_id: '00000000-0000-0000-0001-000000000007', name: 'R. Wickrama' },
 ];
 
 export const RECS: Recommendation[] = [

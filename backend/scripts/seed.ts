@@ -40,12 +40,21 @@ async function seed() {
     await client.query(`
       INSERT INTO zones (id, name, district, province, risk_score, risk_level, active_report_count)
       VALUES
-        ('00000000-0000-0000-0000-000000000001', 'Colombo 3',    'Colombo',  'Western', 45, 'medium', 3),
-        ('00000000-0000-0000-0000-000000000002', 'Colombo 7',    'Colombo',  'Western', 72, 'high',   8),
-        ('00000000-0000-0000-0000-000000000003', 'Kelaniya',     'Gampaha',  'Western', 30, 'low',    1),
-        ('00000000-0000-0000-0000-000000000004', 'Negombo',      'Gampaha',  'Western', 85, 'critical', 12),
-        ('00000000-0000-0000-0000-000000000005', 'Dehiwala',     'Colombo',  'Western', 55, 'medium', 5)
-      ON CONFLICT (id) DO NOTHING
+        ('00000000-0000-0000-0000-000000000001', 'Colombo Fort',    'Colombo',  'Western', 88, 'critical', 14),
+        ('00000000-0000-0000-0000-000000000002', 'Pettah',          'Colombo',  'Western', 81, 'critical', 11),
+        ('00000000-0000-0000-0000-000000000003', 'Maradana',        'Colombo',  'Western', 67, 'high',      8),
+        ('00000000-0000-0000-0000-000000000004', 'Slave Island',    'Colombo',  'Western', 59, 'high',      6),
+        ('00000000-0000-0000-0000-000000000005', 'Kollupitiya',     'Colombo',  'Western', 44, 'medium',    4),
+        ('00000000-0000-0000-0000-000000000006', 'Borella',         'Colombo',  'Western', 38, 'medium',    3),
+        ('00000000-0000-0000-0000-000000000007', 'Bambalapitiya',   'Colombo',  'Western', 22, 'low',       1),
+        ('00000000-0000-0000-0000-000000000008', 'Wellawatte',      'Colombo',  'Western', 17, 'low',       1)
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        district = EXCLUDED.district,
+        province = EXCLUDED.province,
+        risk_score = EXCLUDED.risk_score,
+        risk_level = EXCLUDED.risk_level,
+        active_report_count = EXCLUDED.active_report_count
     `);
     console.log('✅ Zones seeded');
 
@@ -54,8 +63,12 @@ async function seed() {
       `INSERT INTO users (id, email, password_hash, full_name, role, language_preference)
        VALUES
          ('00000000-0000-0000-0001-000000000001', 'admin@dengueguard.lk',   $1, 'NDCU Admin',       'ndcu_admin',     'en'),
-         ('00000000-0000-0000-0001-000000000002', 'phi@dengueguard.lk',     $2, 'PHI Officer',      'phi',            'si'),
-         ('00000000-0000-0000-0001-000000000003', 'drone@dengueguard.lk',   $3, 'Drone Operator 1', 'drone_operator', 'en')
+         ('00000000-0000-0000-0001-000000000002', 'phi@dengueguard.lk',     $2, 'S. Fernando (PHI)', 'phi',            'si'),
+         ('00000000-0000-0000-0001-000000000003', 'drone@dengueguard.lk',   $3, 'Drone Operator 1', 'drone_operator', 'en'),
+         ('00000000-0000-0000-0001-000000000004', 'phi2@dengueguard.lk',    $2, 'K. Perera (PHI)',  'phi',            'si'),
+         ('00000000-0000-0000-0001-000000000005', 'phi3@dengueguard.lk',    $2, 'M. Silva (PHI)',   'phi',            'si'),
+         ('00000000-0000-0000-0001-000000000006', 'phi4@dengueguard.lk',    $2, 'A. Jayasuriya (PHI)', 'phi',            'si'),
+         ('00000000-0000-0000-0001-000000000007', 'phi5@dengueguard.lk',    $2, 'R. Wickrama (PHI)', 'phi',            'si')
        ON CONFLICT (id) DO NOTHING`,
       [hashPassword('Admin@123'), hashPassword('Phi@1234'), hashPassword('Drone@123')],
     );

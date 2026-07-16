@@ -1,0 +1,313 @@
+import type { Report, WorkOrder, Zone, SourceType, ReportStatus, WorkOrderStatus, StaffUser, CurrentUser } from '../types';
+
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:3000/api/v1';
+
+interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+}
+
+// Polygon coordinates for each seeded zone (matched to backend UUIDs)
+const ZONE_COORDS: Record<string, [number, number][]> = {
+  '00000000-0000-0000-0000-000000000001': [[6.940, 79.842], [6.940, 79.856], [6.930, 79.856], [6.930, 79.842]],
+  '00000000-0000-0000-0000-000000000002': [[6.940, 79.856], [6.940, 79.870], [6.930, 79.870], [6.930, 79.856]],
+  '00000000-0000-0000-0000-000000000003': [[6.930, 79.856], [6.930, 79.872], [6.920, 79.872], [6.920, 79.856]],
+  '00000000-0000-0000-0000-000000000004': [[6.930, 79.842], [6.930, 79.856], [6.920, 79.856], [6.920, 79.842]],
+  '00000000-0000-0000-0000-000000000005': [[6.920, 79.840], [6.920, 79.856], [6.908, 79.856], [6.908, 79.840]],
+  '00000000-0000-0000-0000-000000000006': [[6.920, 79.870], [6.920, 79.886], [6.908, 79.886], [6.908, 79.870]],
+  '00000000-0000-0000-0000-000000000007': [[6.908, 79.848], [6.908, 79.864], [6.895, 79.864], [6.895, 79.848]],
+  '00000000-0000-0000-0000-000000000008': [[6.895, 79.850], [6.895, 79.866], [6.882, 79.866], [6.882, 79.850]],
+};
+
+const getLocal = (key: string): string | null => {
+  try { return localStorage.getItem(key); } catch { return null; }
+};
+const setLocal = (key: string, val: string): void => {
+  try { localStorage.setItem(key, val); } catch {}
+};
+const removeLocal = (key: string): void => {
+  try { localStorage.removeItem(key); } catch {}
+};
+
+export const api = {
+  getAccessToken(): string | null { return getLocal('dg_access_token'); },
+  getRefreshToken(): string | null { return getLocal('dg_refresh_token'); },
+
+  getUser(): CurrentUser | null {
+    const raw = getLocal('dg_user');
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  },
+
+  setAuth(tokens: TokenPair, user: CurrentUser) {
+    setLocal('dg_access_token', tokens.access_token);
+    setLocal('dg_refresh_token', tokens.refresh_token);
+    setLocal('dg_user', JSON.stringify(user));
+  },
+
+  logout() {
+    removeLocal('dg_access_token');
+    removeLocal('dg_refresh_token');
+    removeLocal('dg_user');
+  },
+
+  isAuthenticated(): boolean { return !!this.getAccessToken(); },
+
+  async request(url: string, options: RequestInit = {}): Promise<any> {
+    const headers = new Headers(options.headers || {});
+    const token = this.getAccessToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    options.headers = headers;
+
+    let res = await fetch(`${API_BASE}${url}`, options);
+
+    if (res.status === 401 && this.getRefreshToken()) {
+      try {
+        const refreshed = await this.refreshTokens();
+        if (refreshed) {
+          headers.set('Authorization', `Bearer ${this.getAccessToken()}`);
+          res = await fetch(`${API_BASE}${url}`, options);
+        }
+      } catch {
+        this.logout();
+        throw { status: 401, message: 'Session expired. Please log in again.' };
+      }
+    }
+
+    if (!res.ok) {
+      let errorData: any;
+      try { errorData = await res.json(); } catch { errorData = {}; }
+      throw {
+        status: res.status,
+        message: errorData?.error?.message || errorData?.message || 'Request failed',
+        code: errorData?.error?.code || errorData?.code,
+      };
+    }
+    return res.json();
+  },
+
+  async refreshTokens(): Promise<boolean> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) return false;
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) { this.logout(); return false; }
+      const payload = await res.json();
+      if (payload.success && payload.data?.access_token) {
+        setLocal('dg_access_token', payload.data.access_token);
+        if (payload.data.refresh_token) setLocal('dg_refresh_token', payload.data.refresh_token);
+        return true;
+      }
+      return false;
+    } catch { return false; }
+  },
+
+  async login(email: string, password: string): Promise<CurrentUser> {
+    const res = await this.request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    const { access_token, refresh_token, user } = res.data;
+    this.setAuth({ access_token, refresh_token }, user);
+    return user as CurrentUser;
+  },
+
+  async getMe(): Promise<CurrentUser> {
+    const res = await this.request('/auth/me');
+    return res.data.user as CurrentUser;
+  },
+
+  // ── Zones ──────────────────────────────────────────────────────────────
+  async getZones(): Promise<Zone[]> {
+    const res = await this.request('/zones');
+    const raw = res.data || [];
+    return raw.map((z: any) => ({
+      zone_id: z.id,
+      name: z.name,
+      risk_score: z.risk_score,
+      risk_level: z.risk_level,
+      active_report_count: z.active_report_count,
+      open_orders: 0,
+      c: ZONE_COORDS[z.id] || [[6.9271, 79.8612]],
+    }));
+  },
+
+  // ── Reports ────────────────────────────────────────────────────────────
+  async getReports(zoneId?: string): Promise<Report[]> {
+    const qs = zoneId ? `?zone_id=${zoneId}&limit=100` : '?limit=100';
+    const res = await this.request(`/reports${qs}`);
+    const rawReports: any[] = res.data?.data || res.data || [];
+
+    const zonesRes = await this.getZones();
+    const zoneMap = new Map(zonesRes.map((z: Zone) => [z.zone_id, z.name]));
+
+    return rawReports.map((r: any) => {
+      const ai = typeof r.ai_analysis === 'string'
+        ? (() => { try { return JSON.parse(r.ai_analysis); } catch { return {}; } })()
+        : (r.ai_analysis || {});
+      const riskLevel = ((r.risk_level || 'low') as string).toLowerCase() as any;
+      const statusRaw = r.status || '';
+      return {
+        report_id: r.id,
+        source_type: (r.source_type || 'community') as SourceType,
+        lat: r.latitude != null ? Number(r.latitude) : 0,
+        lng: r.longitude != null ? Number(r.longitude) : 0,
+        description: r.notes || '',
+        status: (statusRaw === 'pending' || statusRaw === 'processing') ? 'processing' : 'analysed' as ReportStatus,
+        risk_level: riskLevel,
+        confidence: Math.round(Number(r.confidence_score ?? 0.5) * 100),
+        needs_human_review: statusRaw === 'needs_human_review',
+        remediation_action: r.remediation_action || 'Apply Larvicide',
+        site_type: r.site_type || 'Stagnant Water',
+        larvae_visible: !!ai.larvae_visible,
+        guidance_text: r.guidance_text || 'Perform standard vector inspection.',
+        ai_analysis: {
+          water_present: !!ai.water_present,
+          site_type: r.site_type || 'Container',
+          larvae_visible: !!ai.larvae_visible,
+          reasoning: ai.reasoning || '',
+        },
+        zone_id: r.zone_id || '',
+        zone_name: zoneMap.get(r.zone_id || '') || r.location_name || 'Unknown Zone',
+        created_at: r.created_at || new Date().toISOString(),
+      };
+    });
+  },
+
+  async reviewReport(reportId: string, notes: string): Promise<void> {
+    await this.request(`/reports/${reportId}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ notes, outcome: 'confirmed' }),
+    });
+  },
+
+  // ── Work Orders ────────────────────────────────────────────────────────
+  async getWorkOrders(assignedTo?: string): Promise<any[]> {
+    const qs = assignedTo ? `?assigned_to=${assignedTo}&limit=100` : '?limit=100';
+    const res = await this.request(`/workorders${qs}`);
+    return res.data?.data || res.data || [];
+  },
+
+  async createWorkOrder(reportId: string, priorityScore: number, remediationAction: string, notes?: string): Promise<any> {
+    const res = await this.request('/workorders', {
+      method: 'POST',
+      body: JSON.stringify({ report_id: reportId, priority_score: priorityScore, remediation_action: remediationAction, notes }),
+    });
+    return res.data;
+  },
+
+  async assignWorkOrder(woId: string, phiId: string): Promise<any> {
+    const res = await this.request(`/workorders/${woId}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify({ assigned_to: phiId }),
+    });
+    return res.data;
+  },
+
+  async resolveWorkOrder(woId: string, resolutionNotes: string, verifiedRiskLevel?: string, photoFile?: File): Promise<any> {
+    let body: any;
+    const headers: Record<string, string> = {};
+    if (photoFile) {
+      const formData = new FormData();
+      formData.append('resolution_notes', resolutionNotes);
+      if (verifiedRiskLevel) formData.append('verified_risk_level', verifiedRiskLevel);
+      formData.append('file', photoFile);
+      body = formData;
+    } else {
+      body = JSON.stringify({ resolution_notes: resolutionNotes, verified_risk_level: verifiedRiskLevel });
+      headers['Content-Type'] = 'application/json';
+    }
+    const res = await this.request(`/workorders/${woId}/resolve`, { method: 'PATCH', headers, body });
+    return res.data;
+  },
+
+  async acceptWorkOrder(woId: string): Promise<any> {
+    const res = await this.request(`/workorders/${woId}/accept`, {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    });
+    return res.data;
+  },
+
+  // ── Drone ──────────────────────────────────────────────────────────────
+  async getDroneMissions(): Promise<any[]> {
+    const res = await this.request('/drone/missions?limit=50');
+    return res.data?.data || res.data || [];
+  },
+
+  async createDroneMission(name: string, zoneId?: string): Promise<any> {
+    const res = await this.request('/drone/missions', {
+      method: 'POST',
+      body: JSON.stringify({ name, zone_id: zoneId }),
+    });
+    return res.data;
+  },
+
+  async uploadDroneFrame(missionId: string, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await this.request(`/drone/missions/${missionId}/frames`, { method: 'POST', body: formData });
+    return res.data;
+  },
+
+  // ── Chat ───────────────────────────────────────────────────────────────
+  async sendChatMessage(message: string, sessionId?: string): Promise<{ reply: string; session_id: string }> {
+    const res = await this.request('/chat/message', {
+      method: 'POST',
+      body: JSON.stringify({ message, session_id: sessionId }),
+    });
+    return res.data;
+  },
+
+  // ── Dashboard ─────────────────────────────────────────────────────────
+  async getDashboardSummary(): Promise<any> {
+    const res = await this.request('/dashboard/summary');
+    return res.data;
+  },
+
+  async exportCsv(): Promise<void> {
+    const token = this.getAccessToken();
+    const res = await fetch(`${API_BASE}/dashboard/export`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw { message: 'Failed to export CSV' };
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dengue-reports-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  // ── User Management (NDCU Admin only) ─────────────────────────────────
+  async listStaffUsers(): Promise<StaffUser[]> {
+    const res = await this.request('/auth/staff');
+    return res.data || [];
+  },
+
+  async registerStaff(data: { email: string; password: string; full_name: string; role: string; language_preference?: string }): Promise<StaffUser> {
+    const res = await this.request('/auth/staff/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res.data.user;
+  },
+
+  async updateStaff(userId: string, data: { full_name?: string; email?: string; role?: string; password?: string; is_active?: boolean }): Promise<StaffUser> {
+    const res = await this.request(`/auth/staff/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return res.data.user;
+  },
+};

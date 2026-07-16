@@ -104,3 +104,70 @@ export async function updateUserGoogleId(userId: string, googleId: string): Prom
     [googleId, userId],
   );
 }
+
+export interface StaffUserRow {
+  id: string;
+  email: string | null;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  language_preference: string;
+  assigned_zone_id: string | null;
+  last_login_at: Date | null;
+  created_at: Date;
+}
+
+export async function listStaffUsers(): Promise<StaffUserRow[]> {
+  const result = await query<StaffUserRow>(
+    `SELECT id, email, full_name, role, is_active, language_preference,
+            assigned_zone_id, last_login_at, created_at
+     FROM users
+     WHERE role IN ('ndcu_admin', 'phi', 'drone_operator')
+     ORDER BY created_at ASC`,
+    [],
+  );
+  return result.rows;
+}
+
+export async function updateUserRole(userId: string, role: string): Promise<void> {
+  await query(
+    `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2`,
+    [role, userId],
+  );
+}
+
+export async function toggleUserActive(userId: string, isActive: boolean): Promise<void> {
+  await query(
+    `UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2`,
+    [isActive, userId],
+  );
+}
+
+export async function updateUserDetails(userId: string, updates: {
+  full_name?: string;
+  email?: string;
+  password_hash?: string;
+  role?: string;
+  assigned_zone_id?: string | null;
+  language_preference?: string;
+}): Promise<void> {
+  const fields: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  if (updates.full_name !== undefined)      { fields.push(`full_name = $${idx++}`);           params.push(updates.full_name); }
+  if (updates.email !== undefined)          { fields.push(`email = $${idx++}`);               params.push(updates.email); }
+  if (updates.password_hash !== undefined)  { fields.push(`password_hash = $${idx++}`);       params.push(updates.password_hash); }
+  if (updates.role !== undefined)           { fields.push(`role = $${idx++}`);                params.push(updates.role); }
+  if (updates.assigned_zone_id !== undefined){ fields.push(`assigned_zone_id = $${idx++}`);   params.push(updates.assigned_zone_id); }
+  if (updates.language_preference !== undefined){ fields.push(`language_preference = $${idx++}`); params.push(updates.language_preference); }
+
+  if (fields.length === 0) return;
+  fields.push(`updated_at = NOW()`);
+  params.push(userId);
+
+  await query(
+    `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx}`,
+    params,
+  );
+}

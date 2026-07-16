@@ -44,6 +44,8 @@ export default function MapView() {
   const setActiveReport = useStore((s) => s.setActiveReport);
   const setActiveOrder = useStore((s) => s.setActiveOrder);
 
+  const zones = useStore((s) => s.zones);
+
   // ---- init / teardown ----
   useEffect(() => {
     const el = containerRef.current;
@@ -78,13 +80,13 @@ export default function MapView() {
     if (!ready || !g) return;
     g.clearLayers();
     if (!layers.zones) return;
-    ZONES.forEach((z) => {
-      const col = RISK[z.risk_level].c;
+    zones.forEach((z) => {
+      const col = RISK[z.risk_level]?.c || '#94a29d';
       const poly = L.polygon(z.c, { color: col, weight: 1.5, fillColor: col, fillOpacity: 0.32 }).addTo(g);
       poly.on('click', () => selectZone(z));
       poly.bindTooltip(z.name + ' · ' + z.risk_score, { sticky: true, direction: 'top' });
     });
-  }, [ready, layers.zones, selectZone]);
+  }, [ready, layers.zones, zones, selectZone]);
 
   // ---- report / work-order pins ----
   useEffect(() => {

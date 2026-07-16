@@ -1,11 +1,11 @@
 import { RISK } from '../../theme';
-import { ZONES } from '../../data/zones';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 
 const HEADERS = ['Zone', 'Risk', 'Score', 'Reports', 'Orders'];
 
 export default function ZoneRiskTable() {
+  const zones = useStore((s) => s.zones);
   const selectZone = useStore((s) => s.selectZone);
 
   return (
@@ -24,8 +24,8 @@ export default function ZoneRiskTable() {
           </tr>
         </thead>
         <tbody>
-          {ZONES.map((z) => {
-            const r = RISK[z.risk_level];
+          {zones.map((z) => {
+            const r = RISK[z.risk_level] || RISK.low;
             return (
               <tr
                 key={z.zone_id}

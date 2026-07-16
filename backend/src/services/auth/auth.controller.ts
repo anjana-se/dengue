@@ -7,6 +7,8 @@ import {
   registerStaffService,
   getMeService,
   loginWithGoogleService,
+  listStaffService,
+  updateStaffService,
 } from './auth.service';
 import type {
   RequestOtpInput,
@@ -120,4 +122,26 @@ export async function handleGoogleLogin(
   } catch (err) {
     next(err);
   }
+}
+
+export async function handleListStaff(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await listStaffService(req.user?.role ?? '');
+    res.status(200).json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
+export async function handleUpdateStaff(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await updateStaffService(
+      String(req.params.id),
+      req.body,
+      req.user?.role ?? '',
+    );
+    res.status(200).json({ success: true, data: result });
+  } catch (err) { next(err); }
 }

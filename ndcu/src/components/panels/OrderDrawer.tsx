@@ -6,17 +6,21 @@ import Drawer from '../common/Drawer';
 
 export default function OrderDrawer() {
   const o = useStore((s) => s.activeOrder);
+  const role = useStore((s) => s.role);
   const setActiveOrder = useStore((s) => s.setActiveOrder);
   const setDispatchOrder = useStore((s) => s.setDispatchOrder);
   const resolveWO = useStore((s) => s.resolveWO);
+  const acceptWO = useStore((s) => s.acceptWO);
+
   if (!o) return null;
 
-  const rk = RISK[o.risk_level];
+  const rk = RISK[o.risk_level] || RISK.low;
   const meta: [string, string][] = [
     ['Assigned to', o.assigned_to ? o.assigned_to.name : 'Unassigned'],
     ['Confidence', o.confidence + '%'],
     ['Larvae visible', o.larvae_visible ? 'Yes ⚠' : 'No'],
     ['Created', timf(o.created_at)],
+    ...(o.resolved_at ? [['Resolved', timf(o.resolved_at)] as [string, string]] : []),
   ];
 
   return (
@@ -29,17 +33,8 @@ export default function OrderDrawer() {
         {o.site_type} · Priority {o.priority_score}
       </div>
 
-      <div
-        style={{
-          background: '#f4f7f6',
-          borderRadius: 9,
-          padding: '11px 13px',
-          marginBottom: 14,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
+      {/* GPS */}
+      <div style={{ background: '#f4f7f6', borderRadius: 9, padding: '11px 13px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: 11, color: '#94a29d' }}>Site GPS</div>
           <div style={{ fontSize: 13.5, fontWeight: 600 }}>
@@ -47,7 +42,7 @@ export default function OrderDrawer() {
           </div>
         </div>
         <a
-          href={'https://maps.google.com/?q=' + o.lat + ',' + o.lng}
+          href={`https://maps.google.com/?q=${o.lat},${o.lng}`}
           target="_blank"
           rel="noreferrer"
           style={{ fontSize: 12.5, fontWeight: 600, color: PRIMARY }}
@@ -56,48 +51,35 @@ export default function OrderDrawer() {
         </a>
       </div>
 
-      <div
-        style={{
-          background: rk.bg,
-          borderLeft: '3px solid ' + rk.c,
-          borderRadius: 8,
-          padding: '11px 13px',
-          marginBottom: 14,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: rk.c,
-            textTransform: 'uppercase',
-            letterSpacing: '.04em',
-            marginBottom: 4,
-          }}
-        >
+      {/* AI Guidance */}
+      <div style={{ background: rk.bg, borderLeft: '3px solid ' + rk.c, borderRadius: 8, padding: '11px 13px', marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: rk.c, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>
           AI Guidance
         </div>
-        <div style={{ fontSize: 13, color: '#334b45', lineHeight: 1.5 }}>{o.guidance_text}</div>
+        <div style={{ fontSize: 13, color: '#334b45', lineHeight: 1.5 }}>{o.guidance_text || 'Perform standard vector inspection and apply remediation.'}</div>
       </div>
 
+      {/* NDCU Instructions */}
       {o.ndcu_instructions && (
         <div style={{ marginBottom: 14 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: '#94a29d',
-              textTransform: 'uppercase',
-              letterSpacing: '.06em',
-              marginBottom: 5,
-            }}
-          >
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>
             NDCU Instructions
           </div>
           <div style={{ fontSize: 13, color: '#334b45', lineHeight: 1.5 }}>{o.ndcu_instructions}</div>
         </div>
       )}
 
+      {/* Resolution notes */}
+      {o.notes && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>
+            Resolution notes
+          </div>
+          <div style={{ fontSize: 13, color: '#334b45', lineHeight: 1.5 }}>{o.notes}</div>
+        </div>
+      )}
+
+      {/* Meta grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
         {meta.map(([k, v]) => (
           <div key={k} style={{ background: '#f4f7f6', borderRadius: 8, padding: '8px 11px' }}>
@@ -107,42 +89,39 @@ export default function OrderDrawer() {
         ))}
       </div>
 
+      {/* Actions */}
       {o.status !== 'resolved' && (
         <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => setDispatchOrder(o)}
-            style={{
-              flex: 1,
-              padding: '11px',
-              border: 'none',
-              borderRadius: 9,
-              background: PRIMARY,
-              color: '#fff',
-              cursor: 'pointer',
-              fontFamily: 'Inter',
-              fontSize: 13.5,
-              fontWeight: 600,
-            }}
-          >
-            Assign team
-          </button>
-          <button
-            onClick={() => resolveWO(o.wo_id)}
-            style={{
-              flex: 1,
-              padding: '11px',
-              border: '1px solid #10B981',
-              borderRadius: 9,
-              background: '#fff',
-              color: '#0b6b57',
-              cursor: 'pointer',
-              fontFamily: 'Inter',
-              fontSize: 13.5,
-              fontWeight: 600,
-            }}
-          >
-            Mark resolved
-          </button>
+          {role === 'ndcu_admin' && (
+            <button
+              onClick={() => setDispatchOrder(o)}
+              style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 9, background: PRIMARY, color: '#fff', cursor: 'pointer', fontFamily: 'Inter', fontSize: 13.5, fontWeight: 600 }}
+            >
+              Assign team
+            </button>
+          )}
+          {role === 'phi' && o.status === 'new' && (
+            <button
+              onClick={() => acceptWO(o.wo_id)}
+              style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 9, background: '#3B82F6', color: '#fff', cursor: 'pointer', fontFamily: 'Inter', fontSize: 13.5, fontWeight: 600 }}
+            >
+              Accept task
+            </button>
+          )}
+          {(role === 'phi' || role === 'ndcu_admin') && o.status !== 'new' && (
+            <button
+              onClick={() => resolveWO(o.wo_id)}
+              style={{ flex: 1, padding: '11px', border: '1px solid #10B981', borderRadius: 9, background: '#fff', color: '#0b6b57', cursor: 'pointer', fontFamily: 'Inter', fontSize: 13.5, fontWeight: 600 }}
+            >
+              Mark resolved
+            </button>
+          )}
+        </div>
+      )}
+
+      {o.status === 'resolved' && (
+        <div style={{ padding: '12px', background: '#E7F7F0', borderRadius: 9, textAlign: 'center', fontSize: 13.5, fontWeight: 600, color: '#0b6b57' }}>
+          ✓ Work order resolved
         </div>
       )}
     </Drawer>

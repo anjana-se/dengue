@@ -2,7 +2,7 @@
 
 export type RiskLevel = 'critical' | 'high' | 'medium' | 'low';
 export type Role = 'ndcu_admin' | 'phi' | 'drone_operator';
-export type ViewKey = 'dashboard' | 'reports' | 'workorders' | 'drone' | 'chat';
+export type ViewKey = 'dashboard' | 'reports' | 'workorders' | 'drone' | 'chat' | 'users';
 export type LoginTab = 'email' | 'otp';
 export type SourceType = 'community' | 'drone';
 export type ReportStatus = 'processing' | 'analysed';
@@ -184,3 +184,27 @@ export interface Layers {
 }
 
 export type LayerKey = keyof Layers;
+
+/** Staff user for the user management panel (NDCU Admin only). */
+export interface StaffUser {
+  id: string;
+  email: string | null;
+  full_name: string;
+  role: Role;
+  is_active: boolean;
+  language_preference: string;
+  assigned_zone_id: string | null;
+  last_login_at: string | null;
+  created_at: string;
+}
+
+/** Current logged-in user profile. */
+export interface CurrentUser {
+  id: string;
+  email: string | null;
+  full_name: string;
+  role: Role;
+  language_preference: string;
+  assigned_zone_id: string | null;
+  is_active: boolean;
+}

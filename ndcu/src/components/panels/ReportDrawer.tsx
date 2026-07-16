@@ -3,6 +3,7 @@ import { timf } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
+import { api } from '../../lib/api';
 
 export default function ReportDrawer() {
   const r = useStore((s) => s.activeReport);
@@ -10,10 +11,12 @@ export default function ReportDrawer() {
   const setActiveReport = useStore((s) => s.setActiveReport);
   const createWO = useStore((s) => s.createWO);
   const toast = useStore((s) => s.toast);
+  const fetchData = useStore((s) => s.fetchData);
+
   if (!r) return null;
 
-  const rk = RISK[r.risk_level];
-  const hasWO = orders.some((o) => o.zone_id === r.zone_id && o.site_type === r.site_type);
+  const rk = RISK[r.risk_level] || RISK.low;
+  const hasWO = orders.some((o) => o.zone_id === r.zone_id && o.site_type === r.site_type && o.status !== 'resolved');
 
   const facts: [string, string][] = [
     ['Site type', r.site_type],
@@ -21,6 +24,19 @@ export default function ReportDrawer() {
     ['Larvae visible', r.larvae_visible ? 'Yes ⚠' : 'No'],
     ['Source', r.source_type],
   ];
+
+  const handleReview = async () => {
+    const notes = prompt('Enter review comments/notes (optional):', 'Human review confirmed. Site requires vector control.');
+    if (notes === null) return; // cancelled
+    try {
+      await api.reviewReport(r.report_id, notes);
+      toast('Report human review submitted successfully', 'success');
+      setActiveReport(null);
+      await fetchData();
+    } catch (err: any) {
+      toast(err.message || 'Failed to review report', 'error');
+    }
+  };
 
   return (
     <Drawer title={'Report ' + r.report_id} onClose={() => setActiveReport(null)}>
@@ -155,10 +171,7 @@ export default function ReportDrawer() {
           </button>
         )}
         <button
-          onClick={() => {
-            toast('Flagged for human review', 'info');
-            setActiveReport(null);
-          }}
+          onClick={handleReview}
           style={{
             padding: '11px 15px',
             border: '1px solid #d5ddda',

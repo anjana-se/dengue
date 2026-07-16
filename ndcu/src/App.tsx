@@ -7,28 +7,18 @@ import DispatchModal from './components/modals/DispatchModal';
 
 export default function App() {
   const authed = useStore((s) => s.authed);
-  const demoMode = useStore((s) => s.demoMode);
   const dispatchOrder = useStore((s) => s.dispatchOrder);
 
-  // Live feed: a new report streams in every 9s (gated on authed + liveOn inside liveTick).
+  // Restore session on mount
   useEffect(() => {
-    const id = window.setInterval(() => useStore.getState().liveTick(), 9000);
-    return () => clearInterval(id);
+    useStore.getState().checkSavedAuth();
   }, []);
 
-  // Demo mode: simulate streaming reports, zone updates, and new cases.
+  // Poll for live updates every 30s
   useEffect(() => {
-    if (!demoMode) return;
-    const s = useStore.getState;
-    const t1 = window.setInterval(() => s().demoTickReport(), 45000);
-    const t2 = window.setInterval(() => s().demoTickZone(), 120000);
-    const t3 = window.setInterval(() => s().demoTickCase(), 60000);
-    return () => {
-      clearInterval(t1);
-      clearInterval(t2);
-      clearInterval(t3);
-    };
-  }, [demoMode]);
+    const id = window.setInterval(() => useStore.getState().liveTick(), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <>

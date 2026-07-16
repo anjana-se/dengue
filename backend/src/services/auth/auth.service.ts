@@ -5,6 +5,9 @@ import {
   updateLastLogin,
   findUserByGoogleId,
   updateUserGoogleId,
+  listStaffUsers,
+  updateUserDetails,
+  toggleUserActive,
 } from '../../db/queries/users.queries';
 import { createOtp, verifyOtp } from './otp.store';
 import { sendOtpEmail } from '../../integrations/email/client';
@@ -223,6 +226,46 @@ export async function registerStaffService(
   });
 
   logger.info('Staff user registered', { userId: user.id, role: user.role });
+  return { user: sanitizeUser(user) };
+}
+
+// ─── List staff users (NDCU admin only) ──────────────────────────────────────
+
+export async function listStaffService(requestingUserRole: string) {
+  if (requestingUserRole !== ROLES.NDCU_ADMIN) {
+    throw new ForbiddenError('Only NDCU admins can list staff accounts', 'FORBIDDEN');
+  }
+  const users = await listStaffUsers();
+  return users;
+}
+
+// ─── Update staff user (NDCU admin only) ─────────────────────────────────────
+
+export async function updateStaffService(
+  targetUserId: string,
+  input: { full_name?: string; email?: string; role?: string; password?: string; is_active?: boolean; assigned_zone_id?: string | null },
+  requestingUserRole: string,
+) {
+  if (requestingUserRole !== ROLES.NDCU_ADMIN) {
+    throw new ForbiddenError('Only NDCU admins can update staff accounts', 'FORBIDDEN');
+  }
+
+  const updates: Parameters<typeof updateUserDetails>[1] = {};
+  if (input.full_name !== undefined) updates.full_name = input.full_name;
+  if (input.email !== undefined) updates.email = input.email;
+  if (input.role !== undefined) updates.role = input.role;
+  if (input.assigned_zone_id !== undefined) updates.assigned_zone_id = input.assigned_zone_id;
+  if (input.password !== undefined) updates.password_hash = hashPassword(input.password);
+
+  await updateUserDetails(targetUserId, updates);
+
+  if (input.is_active !== undefined) {
+    await toggleUserActive(targetUserId, input.is_active);
+  }
+
+  const { findUserById } = await import('../../db/queries/users.queries');
+  const user = await findUserById(targetUserId);
+  if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
   return { user: sanitizeUser(user) };
 }
 

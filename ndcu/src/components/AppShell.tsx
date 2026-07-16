@@ -9,23 +9,29 @@ import Reports from './panels/Reports';
 import WorkOrders from './panels/WorkOrders';
 import DroneMissions from './panels/DroneMissions';
 import Assistant from './panels/Assistant';
+import UserManagement from './panels/UserManagement';
+import OrderDrawer from './panels/OrderDrawer';
 import { useStore } from '../store/useStore';
 import type { ViewKey } from '../types';
 
+/** Views that show the side map panel */
+const MAP_VIEWS: ViewKey[] = ['dashboard', 'reports', 'workorders'];
+
 function mapWidth(view: ViewKey): string {
-  return view === 'dashboard' ? '58%' : view === 'workorders' ? '45%' : '55%';
+  if (view === 'dashboard') return '56%';
+  if (view === 'workorders') return '42%';
+  return '52%';
 }
 
-function RightPanel({ view }: { view: ViewKey }) {
+function ContentPanel({ view }: { view: ViewKey }) {
   switch (view) {
-    case 'dashboard':
-      return <Dashboard />;
-    case 'reports':
-      return <Reports />;
-    case 'workorders':
-      return <WorkOrders />;
-    default:
-      return null;
+    case 'dashboard':   return <Dashboard />;
+    case 'reports':     return <Reports />;
+    case 'workorders':  return <WorkOrders />;
+    case 'chat':        return <Assistant />;
+    case 'drone':       return <DroneMissions />;
+    case 'users':       return <UserManagement />;
+    default:            return null;
   }
 }
 
@@ -33,8 +39,9 @@ export default function AppShell() {
   const view = useStore((s) => s.view);
   const selZone = useStore((s) => s.selZone);
   const selPred = useStore((s) => s.selPred);
+  const activeOrder = useStore((s) => s.activeOrder);
 
-  const mapShown = view === 'dashboard' || view === 'reports' || view === 'workorders';
+  const showMap = MAP_VIEWS.includes(view);
   const mapW = mapWidth(view);
 
   return (
@@ -42,38 +49,36 @@ export default function AppShell() {
       <Sidebar />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Topbar />
-        <div style={{ flex: 1, display: 'flex', minHeight: 0, padding: 14, gap: mapShown ? 14 : 0 }}>
-          {/* Map column — kept mounted across views so the Leaflet instance persists. */}
+        <div style={{ flex: 1, display: 'flex', minHeight: 0, padding: 14, gap: showMap ? 14 : 0 }}>
+
+          {/* Map column – mounted but hidden when not relevant */}
           <div
             style={{
-              width: mapShown ? mapW : 0,
-              display: mapShown ? 'block' : 'none',
+              width: showMap ? mapW : 0,
+              display: showMap ? 'block' : 'none',
               position: 'relative',
               borderRadius: 12,
               overflow: 'hidden',
-              border: mapShown ? '1px solid #e2e8e5' : 'none',
-              boxShadow: '0 1px 3px rgba(0,0,0,.05)',
+              border: showMap ? '1px solid #e2e8e5' : 'none',
+              boxShadow: '0 1px 4px rgba(0,0,0,.06)',
               flexShrink: 0,
             }}
           >
             <MapView />
-            {mapShown && <LayerToggle />}
-            {mapShown && selZone && <ZonePopup />}
-            {mapShown && selPred && <PredictionPopup />}
+            {showMap && <LayerToggle />}
+            {showMap && selZone && <ZonePopup />}
+            {showMap && selPred && <PredictionPopup />}
           </div>
 
           {/* Content column */}
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-            {view === 'chat' ? (
-              <Assistant />
-            ) : view === 'drone' ? (
-              <DroneMissions />
-            ) : (
-              <RightPanel view={view} />
-            )}
+            <ContentPanel view={view} />
           </div>
         </div>
       </div>
+
+      {/* Global Order Drawer overlay */}
+      {activeOrder && <OrderDrawer />}
     </div>
   );
 }

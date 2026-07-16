@@ -6,21 +6,24 @@ import type {
   LayerKey,
   Layers,
   LoginTab,
-  Mission,
   Phi,
   Prediction,
   Report,
   Role,
+  StaffUser,
+  CurrentUser,
   Toast,
   ToastKind,
   ViewKey,
   WorkOrder,
+  WorkOrderStatus,
   Zone,
 } from '../types';
 import { RISK } from '../theme';
-import { AGES, CASE_ZONES, HOSPITALS, SITES, ZONES } from '../data/zones';
-import { mkCases, mkOrders, mkReports, pick } from '../data/mock';
+import { AGES, CASE_ZONES, HOSPITALS } from '../data/zones';
+import { mkCases, pick } from '../data/mock';
 import { loadLS, saveLS } from '../utils/storage';
+import { api } from '../lib/api';
 
 const DEFAULT_LAYERS: Layers = {
   zones: true,
@@ -31,70 +34,92 @@ const DEFAULT_LAYERS: Layers = {
 };
 
 function readPredAlertDismissed(): boolean {
-  try {
-    return sessionStorage.getItem('dg_predAlert') === '1';
-  } catch {
-    return false;
-  }
+  try { return sessionStorage.getItem('dg_predAlert') === '1'; } catch { return false; }
 }
 
+/** Which view to land on per role */
 function viewForRole(role: Role): ViewKey {
-  return role === 'phi' ? 'workorders' : role === 'drone_operator' ? 'drone' : 'dashboard';
+  if (role === 'phi') return 'workorders';
+  if (role === 'drone_operator') return 'drone';
+  return 'dashboard';
+}
+
+/** Which views a role can access */
+export function allowedViews(role: Role): ViewKey[] {
+  if (role === 'drone_operator') return ['drone'];
+  if (role === 'phi') return ['workorders', 'reports', 'chat'];
+  // ndcu_admin
+  return ['dashboard', 'reports', 'workorders', 'drone', 'chat', 'users'];
 }
 
 export interface AppState {
-  // ---- auth / shell ----
+  // ── auth ──
   authed: boolean;
   role: Role;
   loginTab: LoginTab;
   view: ViewKey;
+  currentUser: CurrentUser | null;
+  loading: boolean; // global auth loading state
 
-  // ---- data ----
+  // ── data ──
   reports: Report[];
   orders: WorkOrder[];
   cases: DengueCase[];
-  missions: Mission[];
+  missions: any[];
+  zones: Zone[];
+  staffUsers: StaffUser[];
+  dashboardSummary: any | null;
 
-  // ---- selection / drawers ----
+  // ── selection / drawers ──
   activeReport: Report | null;
   activeOrder: WorkOrder | null;
   dispatchOrder: WorkOrder | null;
   selZone: Zone | null;
   selPred: Prediction | null;
 
-  // ---- map controls ----
+  // ── map controls ──
   layers: Layers;
   caseView: CaseView;
   dateFrom: number;
   dateTo: number;
 
-  // ---- misc ----
-  demoMode: boolean;
+  // ── misc ──
   predAlertDismissed: boolean;
   toasts: Toast[];
   chat: ChatMessage[];
+  chatSessionId?: string;
   liveOn: boolean;
+  demoMode: boolean;
 
-  // ---- actions ----
+  // ── actions ──
   setLoginTab: (tab: LoginTab) => void;
-  login: (role: Role) => void;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  checkSavedAuth: () => void;
   setView: (v: ViewKey) => void;
   toggleLayer: (k: LayerKey) => void;
   enableForecastLayer: () => void;
   setCaseView: (v: CaseView) => void;
   setDateRange: (from: number, to: number) => void;
   toggleLive: () => void;
+  toggleDemo: () => void;
   toast: (t: string, kind: ToastKind) => void;
   liveTick: () => void;
-  toggleDemo: () => void;
-  demoTickReport: () => void;
-  demoTickZone: () => void;
   demoTickCase: () => void;
-  createWO: (r: Report) => void;
-  dispatch: (woId: string, phi: Phi | null, instr: string) => void;
-  resolveWO: (woId: string) => void;
-  sendChat: (txt: string) => void;
+
+  // ── data ops ──
+  fetchData: () => Promise<void>;
+  fetchStaffUsers: () => Promise<void>;
+  createWO: (r: Report) => Promise<void>;
+  dispatch: (woId: string, phi: Phi | null, instr: string) => Promise<void>;
+  resolveWO: (woId: string) => Promise<void>;
+  acceptWO: (woId: string) => Promise<void>;
+  sendChat: (txt: string) => Promise<void>;
+  exportCsv: () => Promise<void>;
+  registerStaff: (data: { email: string; password: string; full_name: string; role: string }) => Promise<void>;
+  updateStaff: (userId: string, data: { full_name?: string; email?: string; role?: string; password?: string; is_active?: boolean }) => Promise<void>;
+
+  // ── selections ──
   selectZone: (z: Zone | null) => void;
   selectPrediction: (p: Prediction | null) => void;
   setActiveReport: (r: Report | null) => void;
@@ -103,20 +128,56 @@ export interface AppState {
   dismissPredAlert: () => void;
 }
 
+/** Map backend raw work order row + existing reports into WorkOrder frontend shape */
+function mapWorkOrder(o: any, reportMap: Map<string, Report>, zoneMap: Map<string, string>): WorkOrder {
+  const r = reportMap.get(o.report_id);
+  const statusMapped: WorkOrderStatus =
+    o.status === 'resolved' ? 'resolved' :
+    o.status === 'accepted' ? 'in_progress' :
+    o.assigned_to ? 'assigned' : 'new';
+
+  return {
+    wo_id: o.id,
+    status: statusMapped,
+    priority_score: o.priority_score,
+    assigned_to: o.assigned_to
+      ? { user_id: o.assigned_to, name: 'PHI Officer' }
+      : null,
+    lat: r?.lat ?? 6.9271,
+    lng: r?.lng ?? 79.8612,
+    zone_name: r?.zone_name ?? (zoneMap.get(o.zone_id || '') || 'Unknown Zone'),
+    zone_id: r?.zone_id ?? o.zone_id ?? '',
+    risk_level: r?.risk_level ?? 'low',
+    confidence: r?.confidence ?? 0,
+    site_type: r?.site_type ?? 'Stagnant Water',
+    remediation_action: o.remediation_action || r?.remediation_action || 'Apply Larvicide',
+    guidance_text: r?.guidance_text ?? 'Vector inspection.',
+    larvae_visible: r?.larvae_visible ?? false,
+    image_url: o.follow_up_image_url || null,
+    description: r?.description || '',
+    ndcu_instructions: o.notes || '',
+    notes: o.resolution_notes || '',
+    outcome: o.resolution_notes || null,
+    created_at: o.created_at,
+    resolved_at: o.resolved_at || undefined,
+  };
+}
+
 export const useStore = create<AppState>((set, get) => ({
   authed: false,
   role: 'ndcu_admin',
   loginTab: 'email',
   view: 'dashboard',
+  currentUser: null,
+  loading: false,
 
-  reports: mkReports(),
-  orders: mkOrders(),
+  reports: [],
+  orders: [],
   cases: mkCases(60),
-  missions: [
-    { mission_id: 'M1', mission_name: 'Fort aerial survey — AM', status: 'complete', image_count: 48, processed_count: 48, summary: { critical: 6, high: 9, medium: 12, low: 21 } },
-    { mission_id: 'M2', mission_name: 'Pettah market sweep', status: 'processing', image_count: 36, processed_count: 22, summary: { critical: 3, high: 5, medium: 8, low: 6 } },
-    { mission_id: 'M3', mission_name: 'Maradana rail corridor', status: 'open', image_count: 0, processed_count: 0, summary: { critical: 0, high: 0, medium: 0, low: 0 } },
-  ],
+  missions: [],
+  zones: [],
+  staffUsers: [],
+  dashboardSummary: null,
 
   activeReport: null,
   activeOrder: null,
@@ -129,50 +190,187 @@ export const useStore = create<AppState>((set, get) => ({
   dateFrom: 30,
   dateTo: 0,
 
-  demoMode: false,
   predAlertDismissed: readPredAlertDismissed(),
   toasts: [],
   chat: [
     {
       role: 'assistant',
-      content:
-        "Hello. I'm the DengueGuard assistant. Ask me about zone risk, work orders, or reporting guidance — in English, Sinhala, or Tamil.",
+      content: "Hello. I'm the DengueGuard assistant. Ask me about zone risk, work orders, or reporting guidance — in English, Sinhala, or Tamil.",
       lang: 'en',
     },
   ],
   liveOn: true,
+  demoMode: false,
 
-  // ---------- actions ----------
+  // ── Actions ────────────────────────────────────────────────────────────
   setLoginTab: (loginTab) => set({ loginTab }),
 
-  login: (role) => set({ authed: true, role, view: viewForRole(role) }),
-
-  logout: () => set({ authed: false }),
-
-  setView: (v) => set({ view: v, activeReport: null, activeOrder: null }),
-
-  toggleLayer: (k) =>
-    set((s) => {
-      const layers = { ...s.layers, [k]: !s.layers[k] };
-      saveLS('dg_layers', layers);
-      return { layers };
-    }),
-
-  enableForecastLayer: () =>
-    set((s) => {
-      const layers = { ...s.layers, forecast: true };
-      saveLS('dg_layers', layers);
-      return { layers };
-    }),
-
-  setCaseView: (v) => {
-    saveLS('dg_caseview', v);
-    set({ caseView: v });
+  login: async (email, password) => {
+    set({ loading: true });
+    try {
+      const user = await api.login(email, password);
+      const role = user.role as Role;
+      set({
+        authed: true,
+        role,
+        currentUser: user,
+        view: viewForRole(role),
+        loading: false,
+      });
+      get().toast(`Welcome, ${user.full_name}`, 'success');
+      await get().fetchData();
+    } catch (err: any) {
+      set({ loading: false });
+      get().toast(err.message || 'Login failed. Check your credentials.', 'error');
+      throw err;
+    }
   },
 
-  setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
+  logout: () => {
+    api.logout();
+    set({
+      authed: false,
+      currentUser: null,
+      role: 'ndcu_admin',
+      reports: [],
+      orders: [],
+      missions: [],
+      zones: [],
+      staffUsers: [],
+      dashboardSummary: null,
+      chat: [{
+        role: 'assistant',
+        content: "Hello. I'm the DengueGuard assistant. Ask me about zone risk, work orders, or reporting guidance — in English, Sinhala, or Tamil.",
+        lang: 'en',
+      }],
+      chatSessionId: undefined,
+      activeReport: null,
+      activeOrder: null,
+      dispatchOrder: null,
+    });
+    get().toast('Logged out successfully', 'info');
+  },
 
+  checkSavedAuth: () => {
+    if (api.isAuthenticated()) {
+      const user = api.getUser();
+      if (user) {
+        const role = user.role as Role;
+        set({ authed: true, role, currentUser: user, view: viewForRole(role) });
+        get().fetchData().catch(() => {});
+      }
+    }
+  },
+
+  fetchData: async () => {
+    if (!get().authed) return;
+    const role = get().role;
+    try {
+      // All roles fetch zones
+      const zones = await api.getZones();
+      const zoneMap = new Map(zones.map((z) => [z.zone_id, z.name]));
+
+      if (role === 'drone_operator') {
+        // Drone operator only needs missions
+        const missions = await api.getDroneMissions();
+        set({
+          zones,
+          missions: missions.map((m: any) => ({
+            mission_id: m.id,
+            mission_name: m.name,
+            status: m.status === 'complete' ? 'complete' : m.status === 'in_progress' ? 'processing' : 'open',
+            image_count: m.total_images || 0,
+            processed_count: m.processed_images || 0,
+            summary: m.summary || { critical: 0, high: 0, medium: 0, low: 0 },
+          })),
+        });
+        return;
+      }
+
+      // PHI + NDCU Admin fetch reports and work orders
+      const reports = await api.getReports();
+      const rawOrders = await api.getWorkOrders();
+      const reportMap = new Map(reports.map((r) => [r.report_id, r]));
+
+      const orders: WorkOrder[] = rawOrders.map((o: any) =>
+        mapWorkOrder(o, reportMap, zoneMap)
+      );
+
+      const openOrdersCount: Record<string, number> = {};
+      orders.forEach((o) => {
+        if (o.status !== 'resolved') {
+          openOrdersCount[o.zone_id] = (openOrdersCount[o.zone_id] || 0) + 1;
+        }
+      });
+      const updatedZones = zones.map((z) => ({
+        ...z,
+        open_orders: openOrdersCount[z.zone_id] || 0,
+      }));
+
+      let missions: any[] = [];
+      let dashboardSummary: any = null;
+
+      if (role === 'ndcu_admin') {
+        [missions] = await Promise.all([api.getDroneMissions()]);
+        try { dashboardSummary = await api.getDashboardSummary(); } catch {}
+      }
+
+      set({
+        zones: updatedZones,
+        reports,
+        orders,
+        dashboardSummary,
+        missions: missions.map((m: any) => ({
+          mission_id: m.id,
+          mission_name: m.name,
+          status: m.status === 'complete' ? 'complete' : m.status === 'in_progress' ? 'processing' : 'open',
+          image_count: m.total_images || 0,
+          processed_count: m.processed_images || 0,
+          summary: m.summary || { critical: 0, high: 0, medium: 0, low: 0 },
+        })),
+      });
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to load data', 'error');
+    }
+  },
+
+  fetchStaffUsers: async () => {
+    try {
+      const users = await api.listStaffUsers();
+      set({ staffUsers: users });
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to load staff users', 'error');
+    }
+  },
+
+  setView: (v) => {
+    const allowed = allowedViews(get().role);
+    if (!allowed.includes(v)) return;
+    set({ view: v, activeReport: null, activeOrder: null });
+    // Fetch staff users when navigating to users panel
+    if (v === 'users') get().fetchStaffUsers();
+  },
+
+  toggleLayer: (k) => set((s) => {
+    const layers = { ...s.layers, [k]: !s.layers[k] };
+    saveLS('dg_layers', layers);
+    return { layers };
+  }),
+
+  enableForecastLayer: () => set((s) => {
+    const layers = { ...s.layers, forecast: true };
+    saveLS('dg_layers', layers);
+    return { layers };
+  }),
+
+  setCaseView: (v) => { saveLS('dg_caseview', v); set({ caseView: v }); },
+  setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
   toggleLive: () => set((s) => ({ liveOn: !s.liveOn })),
+  toggleDemo: () => {
+    const on = !get().demoMode;
+    set({ demoMode: on });
+    get().toast(on ? 'Live polling paused (demo UI)' : 'Demo stopped', 'info');
+  },
 
   toast: (t, kind) => {
     const id = Date.now() + Math.random();
@@ -180,85 +378,10 @@ export const useStore = create<AppState>((set, get) => ({
     setTimeout(() => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })), 3800);
   },
 
-  liveTick: () => {
+  liveTick: async () => {
     const s = get();
-    if (!s.authed || !s.liveOn) return;
-    const z = ZONES[Math.floor(Math.random() * 4)];
-    const lv = Math.random() > 0.6 ? 'critical' : Math.random() > 0.5 ? 'high' : 'medium';
-    const r: Report = {
-      report_id: 'R' + Math.floor(Math.random() * 9000 + 2000),
-      source_type: Math.random() > 0.5 ? 'community' : 'drone',
-      lat: z.c[0][0] - Math.random() * 0.008,
-      lng: z.c[0][1] + Math.random() * 0.012,
-      description: 'Live report — standing water',
-      status: 'analysed',
-      risk_level: lv,
-      confidence: 65 + Math.floor(Math.random() * 33),
-      needs_human_review: false,
-      remediation_action: 'Source reduction + larvicide',
-      site_type: SITES[Math.floor(Math.random() * SITES.length)],
-      larvae_visible: lv !== 'medium',
-      guidance_text: 'Empty and scrub the container. Apply larvicide to residual water.',
-      ai_analysis: {
-        water_present: true,
-        site_type: 'Container',
-        larvae_visible: lv !== 'medium',
-        reasoning: 'Live-triaged breeding site.',
-      },
-      zone_id: z.zone_id,
-      zone_name: z.name,
-      created_at: new Date().toISOString(),
-      _new: true,
-    };
-    set((st) => ({ reports: [r, ...st.reports].slice(0, 60) }));
-    get().toast('New ' + RISK[lv].label.toLowerCase() + '-risk report in ' + z.name, 'info');
-  },
-
-  toggleDemo: () => {
-    const on = !get().demoMode;
-    set({ demoMode: on });
-    if (on) get().toast('Demo mode active — simulating live data', 'success');
-    else get().toast('Demo mode stopped', 'info');
-  },
-
-  demoTickReport: () => {
-    const z = ZONES[Math.floor(Math.random() * 3)];
-    const lv = Math.random() > 0.5 ? 'critical' : 'high';
-    const r: Report = {
-      report_id: 'R' + Math.floor(Math.random() * 9000 + 2000),
-      source_type: 'community',
-      lat: z.c[0][0] - Math.random() * 0.008,
-      lng: z.c[0][1] + Math.random() * 0.012,
-      description: '[Demo] high-risk community report',
-      status: 'analysed',
-      risk_level: lv,
-      confidence: 78 + Math.floor(Math.random() * 20),
-      needs_human_review: false,
-      remediation_action: 'Source reduction + larvicide',
-      site_type: SITES[Math.floor(Math.random() * SITES.length)],
-      larvae_visible: true,
-      guidance_text: 'Empty and scrub the container. Apply larvicide.',
-      ai_analysis: {
-        water_present: true,
-        site_type: 'Container',
-        larvae_visible: true,
-        reasoning: 'Demo synthetic breeding site.',
-      },
-      zone_id: z.zone_id,
-      zone_name: z.name,
-      created_at: new Date().toISOString(),
-      _new: true,
-    };
-    set((s) => ({ reports: [r, ...s.reports].slice(0, 60) }));
-    get().toast('report:analysed — ' + RISK[lv].label + ' in ' + z.name, 'info');
-  },
-
-  demoTickZone: () => {
-    const z = ZONES[Math.floor(Math.random() * ZONES.length)];
-    get().toast(
-      'zone:updated — ' + z.name + ' risk ' + (z.risk_score + Math.floor(Math.random() * 6 - 2)),
-      'info',
-    );
+    if (!s.authed || !s.liveOn || s.demoMode) return;
+    await s.fetchData();
   },
 
   demoTickCase: () => {
@@ -273,78 +396,114 @@ export const useStore = create<AppState>((set, get) => ({
       zone_name: cz.n,
       reported_date: new Date().toISOString(),
       age_group: pick(AGES),
-      severity,
+      severity: severity as any,
       hospital: pick(HOSPITALS),
       status: 'active',
     };
     set((s) => ({ cases: [c, ...s.cases] }));
   },
 
-  createWO: (r) => {
-    const wo: WorkOrder = {
-      wo_id: 'WO' + Math.floor(Math.random() * 900 + 300),
-      status: 'new',
-      priority_score: r.confidence,
-      assigned_to: null,
-      lat: r.lat,
-      lng: r.lng,
-      zone_name: r.zone_name,
-      zone_id: r.zone_id,
-      risk_level: r.risk_level,
-      confidence: r.confidence,
-      site_type: r.site_type,
-      remediation_action: r.remediation_action,
-      guidance_text: r.guidance_text,
-      larvae_visible: r.larvae_visible,
-      image_url: null,
-      description: r.description,
-      ndcu_instructions: '',
-      notes: '',
-      outcome: null,
-      created_at: new Date().toISOString(),
-    };
-    set((s) => ({ orders: [wo, ...s.orders], activeReport: null }));
-    get().toast('Work order ' + wo.wo_id + ' created', 'success');
+  createWO: async (r) => {
+    try {
+      await api.createWorkOrder(r.report_id, r.confidence, r.remediation_action, r.description);
+      set({ activeReport: null });
+      get().toast('Work order created', 'success');
+      await get().fetchData();
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to create work order', 'error');
+    }
   },
 
-  dispatch: (woId, phi, instr) => {
-    set((s) => ({
-      orders: s.orders.map((o) =>
-        o.wo_id === woId ? { ...o, status: 'assigned', assigned_to: phi, ndcu_instructions: instr } : o,
-      ),
-      dispatchOrder: null,
-      activeOrder: null,
-    }));
-    get().toast('Team dispatched to ' + (phi ? phi.name : 'unassigned'), 'success');
+  dispatch: async (woId, phi, _instr) => {
+    if (!phi) { get().toast('Select a PHI officer first', 'error'); return; }
+    try {
+      await api.assignWorkOrder(woId, phi.user_id);
+      set({ dispatchOrder: null, activeOrder: null });
+      get().toast(`Work order assigned to ${phi.name}`, 'success');
+      await get().fetchData();
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to assign team', 'error');
+    }
   },
 
-  resolveWO: (woId) => {
-    set((s) => ({
-      orders: s.orders.map((o) =>
-        o.wo_id === woId
-          ? { ...o, status: 'resolved', outcome: 'resolved_clean', resolved_at: new Date().toISOString() }
-          : o,
-      ),
-      activeOrder: null,
-    }));
-    get().toast('Work order marked resolved', 'success');
+  resolveWO: async (woId) => {
+    const notes = window.prompt('Resolution notes (min 10 characters):', 'Remediation completed successfully.');
+    if (notes === null) return;
+    if (notes.trim().length < 10) {
+      get().toast('Notes must be at least 10 characters', 'error');
+      return;
+    }
+    const rl = window.prompt('Verified risk level after remediation (low / medium / high / critical):', 'low');
+    const validRl = ['low', 'medium', 'high', 'critical'];
+    const verifiedRl = rl && validRl.includes(rl.toLowerCase()) ? rl.toLowerCase() : undefined;
+    try {
+      await api.resolveWorkOrder(woId, notes, verifiedRl);
+      set({ activeOrder: null });
+      get().toast('Work order resolved', 'success');
+      await get().fetchData();
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to resolve work order', 'error');
+    }
   },
 
-  sendChat: (txt) => {
+  acceptWO: async (woId) => {
+    try {
+      await api.acceptWorkOrder(woId);
+      get().toast('Work order accepted', 'success');
+      await get().fetchData();
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to accept work order', 'error');
+    }
+  },
+
+  sendChat: async (txt) => {
     if (!txt.trim()) return;
-    const reply =
-      'Based on current data, ' +
-      ZONES[0].name +
-      ' and ' +
-      ZONES[1].name +
-      ' are your highest-priority zones (' +
-      ZONES[0].risk_score +
-      ' and ' +
-      ZONES[1].risk_score +
-      '). I recommend dispatching source-reduction teams there first. Would you like me to draft work orders?';
-    set((s) => ({
-      chat: [...s.chat, { role: 'user', content: txt, lang: 'en' }, { role: 'assistant', content: reply, lang: 'en' }],
-    }));
+    const userMsg: ChatMessage = { role: 'user', content: txt, lang: 'en' };
+    set((s) => ({ chat: [...s.chat, userMsg] }));
+    try {
+      const sessionId = get().chatSessionId;
+      const res = await api.sendChatMessage(txt, sessionId);
+      const replyMsg: ChatMessage = { role: 'assistant', content: res.reply, lang: 'en' };
+      set((s) => ({ chat: [...s.chat, replyMsg], chatSessionId: res.session_id }));
+    } catch (err: any) {
+      const errMsg: ChatMessage = {
+        role: 'assistant',
+        content: `⚠️ ${err.message || 'Could not reach AI assistant. Please try again.'}`,
+        lang: 'en',
+      };
+      set((s) => ({ chat: [...s.chat, errMsg] }));
+    }
+  },
+
+  exportCsv: async () => {
+    try {
+      await api.exportCsv();
+      get().toast('CSV export downloaded', 'success');
+    } catch (err: any) {
+      get().toast(err.message || 'Export failed', 'error');
+    }
+  },
+
+  registerStaff: async (data) => {
+    try {
+      await api.registerStaff(data);
+      get().toast(`Staff account created for ${data.email}`, 'success');
+      await get().fetchStaffUsers();
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to create staff account', 'error');
+      throw err;
+    }
+  },
+
+  updateStaff: async (userId, data) => {
+    try {
+      await api.updateStaff(userId, data);
+      get().toast('Staff account updated', 'success');
+      await get().fetchStaffUsers();
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to update staff account', 'error');
+      throw err;
+    }
   },
 
   selectZone: (z) => set({ selZone: z, selPred: null }),
@@ -354,11 +513,7 @@ export const useStore = create<AppState>((set, get) => ({
   setDispatchOrder: (o) => set({ dispatchOrder: o }),
 
   dismissPredAlert: () => {
-    try {
-      sessionStorage.setItem('dg_predAlert', '1');
-    } catch {
-      /* ignore */
-    }
+    try { sessionStorage.setItem('dg_predAlert', '1'); } catch {}
     set({ predAlertDismissed: true });
   },
 }));
