@@ -4,7 +4,7 @@ import { logger } from '../../shared/logger';
 import { parseVisionResponse, type ParsedAnalysisResult } from '../gemini/responseParser';
 import { translateGuidanceTextBoth } from '../gemini/translation';
 import {
-  buildVisionSystemPrompt,
+  buildNvidiaVisionSystemPrompt,
   buildVisionUserPrompt,
 } from '../gemini/promptTemplates/systemPrompts';
 
@@ -37,7 +37,7 @@ export async function analyzeBreedingSiteImageNvidia(
   const base64Image = imageBytes.toString('base64');
   const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-  const systemPrompt = buildVisionSystemPrompt();
+  const systemPrompt = buildNvidiaVisionSystemPrompt();
   const userPrompt = buildVisionUserPrompt();
 
   const messages = [
@@ -60,12 +60,12 @@ export async function analyzeBreedingSiteImageNvidia(
 
   logger.debug('Sending request to NVIDIA NIM API...');
   const startTime = Date.now();
-  
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     logger.warn('NVIDIA NIM API call timed out after 75s, aborting request.');
     controller.abort();
-  }, 75000);
+  }, 80000);
 
   const isReasoningModel = modelName.includes('reasoning');
   const payload: any = {
@@ -73,7 +73,7 @@ export async function analyzeBreedingSiteImageNvidia(
     messages,
     temperature: 0.2,
     top_p: 0.95,
-    max_tokens: isReasoningModel ? 4096 : 1024,
+    max_tokens: isReasoningModel ? 4096 : 2048,
     stream: false,
     response_format: { type: 'json_object' },
   };
