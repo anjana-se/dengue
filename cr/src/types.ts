@@ -30,6 +30,8 @@ export interface Report {
   hours?: number;
   /** Optional AI localized guidance text. */
   guidanceText?: string;
+  guidanceTextSi?: string;
+  guidanceTextTa?: string;
   /** Optional coordinates and image URL. */
   latitude?: number;
   longitude?: number;

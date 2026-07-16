@@ -79,7 +79,8 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
     const imagePath = await resolveLocalImagePath(image_url);
 
     // ── 3. Resize + strip EXIF ─────────────────────────────────────────────
-    const resized = await resizeImage(imagePath, { keepGps: false });
+    // Use 768px for the AI processing image (significantly speeds up VLM inference and prevents timeouts)
+    const resized = await resizeImage(imagePath, { keepGps: false, maxEdge: 768 });
     processedImagePath = resized.outputPath;
 
     // ── 4. Vision analysis (dynamic provider selection) ───────────────────
@@ -169,7 +170,7 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
     // On unrecoverable error, mark report as failed
     const isLastAttempt = (job.attemptsMade + 1) >= (job.opts.attempts ?? 3);
     if (isLastAttempt) {
-      await updateReportStatus(report_id, 'failed').catch(() => {});
+      await updateReportStatus(report_id, 'failed').catch(() => { });
       logger.error('AI analysis failed permanently', {
         reportId: report_id,
         error: (err as Error).message,

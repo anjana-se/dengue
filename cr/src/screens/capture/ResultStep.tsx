@@ -7,12 +7,21 @@ import type { RiskLevel } from "../../types";
 interface ResultStepProps {
   risk: RiskLevel;
   guidanceText?: string;
+  guidanceTextSi?: string;
+  guidanceTextTa?: string;
   onReportAnother: () => void;
   onViewReports: () => void;
 }
 
-export function ResultStep({ risk, guidanceText, onReportAnother, onViewReports }: ResultStepProps) {
-  const { t } = useI18n();
+export function ResultStep({
+  risk,
+  guidanceText,
+  guidanceTextSi,
+  guidanceTextTa,
+  onReportAnother,
+  onViewReports,
+}: ResultStepProps) {
+  const { t, lang } = useI18n();
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "28px 22px", animation: "dgfade .4s ease" }}>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 22 }}>
@@ -46,7 +55,7 @@ export function ResultStep({ risk, guidanceText, onReportAnother, onViewReports 
           {t("guidance_label")}
         </div>
         <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: "#33433c" }}>
-          {guidanceText || GUIDE[risk]}
+          {(lang === "si" ? guidanceTextSi : lang === "ta" ? guidanceTextTa : guidanceText) || guidanceText || GUIDE[risk]}
         </p>
       </div>
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 11 }}>

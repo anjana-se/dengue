@@ -1,4 +1,5 @@
 import http from 'http';
+// Trigger reload for config update
 import { createApp, config } from './app';
 import { logger } from './shared/logger';
 import { pool } from './db/client';

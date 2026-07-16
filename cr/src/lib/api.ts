@@ -298,15 +298,6 @@ export const api = {
     // Map risk_level ('low', 'medium', 'high', 'critical' or null)
     const risk = (r.risk_level || "low").toLowerCase() as Report["risk"];
 
-    // Retrieve active language preference from localStorage
-    const lang = localStorage.getItem("dg.lang") || "en";
-    let guidanceText = r.guidance_text;
-    if (lang === "si" && r.guidance_text_si) {
-      guidanceText = r.guidance_text_si;
-    } else if (lang === "ta" && r.guidance_text_ta) {
-      guidanceText = r.guidance_text_ta;
-    }
-
     const latNum = r.latitude != null ? Number(r.latitude) : null;
     const lngNum = r.longitude != null ? Number(r.longitude) : null;
 
@@ -336,7 +327,9 @@ export const api = {
       confidence: Math.round(Number(r.confidence_score ?? 0.5) * 100),
       days,
       hours: days === 0 ? Math.max(1, hours) : undefined,
-      guidanceText: guidanceText || undefined,
+      guidanceText: r.guidance_text || undefined,
+      guidanceTextSi: r.guidance_text_si || undefined,
+      guidanceTextTa: r.guidance_text_ta || undefined,
       latitude: latNum || undefined,
       longitude: lngNum || undefined,
       imageUrl,
