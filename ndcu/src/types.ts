@@ -14,6 +14,14 @@ export type RiskTrend = 'rising' | 'stable' | 'falling';
 export type CaseView = 'cluster' | 'heatmap';
 export type ToastKind = 'success' | 'error' | 'info';
 export type MissionStatus = 'open' | 'processing' | 'complete';
+export type IncidentStatus = 'open' | 'verified' | 'resolved' | 'closed';
+export type DecisionType = 'auto_attached' | 'flagged_review' | 'new_incident';
+export type DecisionStatus = 'pending' | 'approved' | 'overridden';
+export type TrapStatus = 'active' | 'offline' | 'maintenance';
+export type TrapView = 'traps' | 'heatmap';
+export type Species = 'aedes_aegypti' | 'aedes_albopictus';
+export type DashLayout = 'map' | 'split' | 'stats';
+export type ReportFilter = 'all' | 'open' | 'verified' | 'needs_review';
 
 /** [lat, lng] tuple as consumed by Leaflet. */
 export type LatLng = [number, number];
@@ -56,6 +64,7 @@ export interface Report {
   ai_analysis: AiAnalysis;
   zone_id: string;
   zone_name: string;
+  incident_id?: string;
   created_at: string;
   /** Set on freshly streamed-in reports so the feed can animate them. */
   _new?: boolean;
@@ -88,6 +97,8 @@ export interface WorkOrder {
   outcome: string | null;
   created_at: string;
   resolved_at?: string;
+  incident_id?: string;
+  confirmation_count?: number;
 }
 
 export interface Recommendation {
@@ -184,6 +195,7 @@ export interface Layers {
   drone: boolean;
   cases: boolean;
   forecast: boolean;
+  traps: boolean;
 }
 
 export type LayerKey = keyof Layers;
@@ -210,4 +222,85 @@ export interface CurrentUser {
   language_preference: string;
   assigned_zone_id: string | null;
   is_active: boolean;
+}
+
+// ---------- Incidents & duplicate handling ----------
+export interface Incident {
+  incident_id: string;
+  code: string;
+  status: IncidentStatus;
+  risk_level: RiskLevel;
+  lat: number;
+  lng: number;
+  zone_id: string;
+  zone_name: string;
+  confirmation_count: number;
+  report_count: number;
+  primary_report_id: string;
+  created_at: string;
+  verified_at: string | null;
+  resolved_at: string | null;
+  site_type: string;
+  mergedInto?: string;
+}
+
+export interface Decision {
+  decision_id: string;
+  new_report_id: string;
+  matched_incident_id: string | null;
+  confidence: number;
+  decision: DecisionType;
+  status: DecisionStatus;
+  ai_reasoning: string;
+  reviewed_by: string | null;
+  override_reason: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  gps_distance_m: number;
+  time_diff_h: number;
+  new_lat: number;
+  new_lng: number;
+}
+
+/** A report row derived for an incident's detail view. */
+export interface IncidentReport {
+  report_id: string;
+  role: string;
+  submitted_at: string;
+  risk_level: RiskLevel;
+  confidence: number;
+  primary: boolean;
+  site_type: string;
+}
+
+export interface IncidentDetail {
+  inc: Incident;
+  reports: IncidentReport[];
+  decisions: Decision[];
+}
+
+// ---------- IoT mosquito traps ----------
+export interface TrapReadings {
+  mosquito_count_24h: number;
+  mosquito_count_7d: number;
+  species_detected: Species[];
+  larvae_detected: boolean;
+  water_temp_c: number;
+  humidity_percent: number;
+  trap_fill_percent: number;
+}
+
+export interface Trap {
+  trap_id: string;
+  serial_number: string;
+  lat: number;
+  lng: number;
+  zone_id: string;
+  zone_name: string;
+  district: string;
+  status: TrapStatus;
+  battery_percent: number;
+  last_sync_at: string;
+  installed_at: string;
+  readings: TrapReadings;
 }

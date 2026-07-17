@@ -1,5 +1,5 @@
-import { PRIMARY } from '../theme';
-import { useStore, allowedViews } from '../store/useStore';
+import { PRIMARY, AMBER } from '../theme';
+import { useStore, allowedViews, pendingDecisions } from '../store/useStore';
 import type { Role, ViewKey } from '../types';
 
 const ALL_ITEMS: { key: ViewKey; label: string; icon: string; desc: string }[] = [
@@ -29,6 +29,8 @@ export default function Sidebar() {
   const currentUser = useStore((s) => s.currentUser);
   const setView = useStore((s) => s.setView);
   const logout = useStore((s) => s.logout);
+  const decisions = useStore((s) => s.decisions);
+  const pendingCount = pendingDecisions(decisions).length;
 
   const visible = ALL_ITEMS.filter((i) => allowedViews(role).includes(i.key));
   const initials = (currentUser?.full_name || 'U')
@@ -89,6 +91,7 @@ export default function Sidebar() {
       <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
         {visible.map(({ key, label, icon }) => {
           const on = view === key;
+          const pc = key === 'reports' ? pendingCount : 0;
           return (
             <button
               key={key}
@@ -115,8 +118,27 @@ export default function Sidebar() {
               <span style={{ width: 20, textAlign: 'center', fontSize: 15, opacity: 0.9, flexShrink: 0 }}>
                 {icon}
               </span>
-              {label}
-              {on && (
+              <span style={{ flex: 1 }}>{label}</span>
+              {pc > 0 && (
+                <span
+                  style={{
+                    minWidth: 18,
+                    height: 18,
+                    padding: '0 5px',
+                    borderRadius: 9,
+                    background: AMBER,
+                    color: '#fff',
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {pc}
+                </span>
+              )}
+              {on && !pc && (
                 <span
                   style={{
                     marginLeft: 'auto',

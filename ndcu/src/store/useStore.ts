@@ -2,26 +2,39 @@ import { create } from 'zustand';
 import type {
   CaseView,
   ChatMessage,
+  DashLayout,
+  Decision,
   DengueCase,
+  Incident,
+  IncidentDetail,
+  IncidentReport,
+  IncidentStatus,
   LayerKey,
   Layers,
   LoginTab,
+  Mission,
   Phi,
   Prediction,
   Report,
+  ReportFilter,
   Role,
   StaffUser,
   CurrentUser,
   Toast,
   ToastKind,
+  Trap,
+  TrapView,
   ViewKey,
   WorkOrder,
   WorkOrderStatus,
   Zone,
 } from '../types';
-import { RISK } from '../theme';
-import { AGES, CASE_ZONES, HOSPITALS } from '../data/zones';
+import { INC_STATUS, RISK } from '../theme';
+import { AGES, CASE_ZONES, HOSPITALS, SITES, ZONES } from '../data/zones';
 import { mkCases, pick } from '../data/mock';
+import { INCIDENTS, DECISIONS, ROLES } from '../data/incidents';
+import { mkTraps } from '../data/traps';
+import { uuid } from '../utils/uuid';
 import { loadLS, saveLS } from '../utils/storage';
 import { api } from '../lib/api';
 
@@ -31,6 +44,7 @@ const DEFAULT_LAYERS: Layers = {
   drone: true,
   cases: false,
   forecast: false,
+  traps: false,
 };
 
 function readPredAlertDismissed(): boolean {
@@ -60,6 +74,7 @@ export interface AppState {
   view: ViewKey;
   currentUser: CurrentUser | null;
   loading: boolean; // global auth loading state
+  dashLayout: DashLayout;
 
   // ── data ──
   reports: Report[];
@@ -69,6 +84,9 @@ export interface AppState {
   zones: Zone[];
   staffUsers: StaffUser[];
   dashboardSummary: any | null;
+  incidents: Incident[];
+  decisions: Decision[];
+  traps: Trap[];
 
   // ── selection / drawers ──
   activeReport: Report | null;
@@ -76,12 +94,28 @@ export interface AppState {
   dispatchOrder: WorkOrder | null;
   selZone: Zone | null;
   selPred: Prediction | null;
+  selIncident: Incident | null;
+  activeIncident: string | null;
+  mergeSource: string | null;
+  mergeQuery: string;
+  overrideDec: string | null;
+  predPanel: boolean;
 
   // ── map controls ──
   layers: Layers;
   caseView: CaseView;
+  trapView: TrapView;
   dateFrom: number;
   dateTo: number;
+  legendOpen: boolean;
+
+  // ── panels / filters ──
+  reportFilter: ReportFilter;
+  reportZone: string;
+  reportSev: string;
+  reportSite: string;
+  dupReviewOpen: boolean | null;
+  iotAlertOpen: boolean | null;
 
   // ── misc ──
   predAlertDismissed: boolean;
@@ -97,20 +131,29 @@ export interface AppState {
   logout: () => void;
   checkSavedAuth: () => void;
   setView: (v: ViewKey) => void;
+  setDashLayout: (m: DashLayout) => void;
   toggleLayer: (k: LayerKey) => void;
   enableForecastLayer: () => void;
   setCaseView: (v: CaseView) => void;
+  setTrapView: (v: TrapView) => void;
   setDateRange: (from: number, to: number) => void;
+  setLegendOpen: (open: boolean) => void;
   toggleLive: () => void;
   toggleDemo: () => void;
   toast: (t: string, kind: ToastKind) => void;
   liveTick: () => void;
+  demoTickReport: () => void;
+  demoTickZone: () => void;
   demoTickCase: () => void;
+  demoTickDuplicate: () => void;
+  demoTickIncident: () => void;
 
   // ── data ops ──
   fetchData: () => Promise<void>;
   fetchStaffUsers: () => Promise<void>;
   createWO: (r: Report) => Promise<void>;
+  createWOFromIncident: (inc: Incident) => void;
+  createWOFromTrap: (t: Trap, reason: string) => void;
   dispatch: (woId: string, phi: Phi | null, instr: string) => Promise<void>;
   resolveWO: (woId: string) => Promise<void>;
   acceptWO: (woId: string) => Promise<void>;
@@ -122,10 +165,32 @@ export interface AppState {
   // ── selections ──
   selectZone: (z: Zone | null) => void;
   selectPrediction: (p: Prediction | null) => void;
+  selectIncident: (inc: Incident | null) => void;
   setActiveReport: (r: Report | null) => void;
   setActiveOrder: (o: WorkOrder | null) => void;
   setDispatchOrder: (o: WorkOrder | null) => void;
   dismissPredAlert: () => void;
+
+  // ── predictions panel ──
+  openPredictions: () => void;
+  setPredPanel: (open: boolean) => void;
+  showPredictionOnMap: (p: Prediction) => void;
+
+  // ── incidents / duplicates ──
+  setReportFilter: (f: ReportFilter) => void;
+  setReportZone: (v: string) => void;
+  setReportSev: (v: string) => void;
+  setReportSite: (v: string) => void;
+  setDupReviewOpen: (open: boolean) => void;
+  setIotAlertOpen: (open: boolean) => void;
+  setActiveIncident: (id: string | null) => void;
+  getIncident: (id: string | null) => IncidentDetail | null;
+  setIncidentStatus: (id: string, status: IncidentStatus) => void;
+  updateDecision: (id: string, action: 'approve' | 'override', reason?: string | null) => void;
+  setOverrideDec: (id: string | null) => void;
+  setMergeSource: (id: string | null) => void;
+  setMergeQuery: (q: string) => void;
+  mergeIncidents: (srcId: string, tgtId: string) => void;
 }
 
 /** Map backend raw work order row + existing reports into WorkOrder frontend shape */
@@ -170,6 +235,7 @@ export const useStore = create<AppState>((set, get) => ({
   view: 'dashboard',
   currentUser: null,
   loading: false,
+  dashLayout: loadLS<DashLayout>('dg_dashlayout', 'split'),
 
   reports: [],
   orders: [],
@@ -178,17 +244,35 @@ export const useStore = create<AppState>((set, get) => ({
   zones: [],
   staffUsers: [],
   dashboardSummary: null,
+  incidents: INCIDENTS,
+  decisions: DECISIONS,
+  traps: mkTraps(),
 
   activeReport: null,
   activeOrder: null,
   dispatchOrder: null,
   selZone: null,
   selPred: null,
+  selIncident: null,
+  activeIncident: null,
+  mergeSource: null,
+  mergeQuery: '',
+  overrideDec: null,
+  predPanel: false,
 
-  layers: loadLS<Layers>('dg_layers', DEFAULT_LAYERS),
+  layers: { ...DEFAULT_LAYERS, ...loadLS<Partial<Layers>>('dg_layers', {}) },
   caseView: loadLS<CaseView>('dg_caseview', 'cluster'),
+  trapView: loadLS<TrapView>('dg_trapview', 'traps'),
   dateFrom: 30,
   dateTo: 0,
+  legendOpen: true,
+
+  reportFilter: 'all',
+  reportZone: 'all',
+  reportSev: 'all',
+  reportSite: 'all',
+  dupReviewOpen: null,
+  iotAlertOpen: null,
 
   predAlertDismissed: readPredAlertDismissed(),
   toasts: [],
@@ -247,6 +331,12 @@ export const useStore = create<AppState>((set, get) => ({
       activeReport: null,
       activeOrder: null,
       dispatchOrder: null,
+      selIncident: null,
+      activeIncident: null,
+      mergeSource: null,
+      mergeQuery: '',
+      overrideDec: null,
+      predPanel: false,
     });
     get().toast('Logged out successfully', 'info');
   },
@@ -351,6 +441,11 @@ export const useStore = create<AppState>((set, get) => ({
     if (v === 'users') get().fetchStaffUsers();
   },
 
+  setDashLayout: (m) => {
+    saveLS('dg_dashlayout', m);
+    set({ dashLayout: m });
+  },
+
   toggleLayer: (k) => set((s) => {
     const layers = { ...s.layers, [k]: !s.layers[k] };
     saveLS('dg_layers', layers);
@@ -364,12 +459,14 @@ export const useStore = create<AppState>((set, get) => ({
   }),
 
   setCaseView: (v) => { saveLS('dg_caseview', v); set({ caseView: v }); },
+  setTrapView: (v) => { saveLS('dg_trapview', v); set({ trapView: v }); },
   setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
+  setLegendOpen: (legendOpen) => set({ legendOpen }),
   toggleLive: () => set((s) => ({ liveOn: !s.liveOn })),
   toggleDemo: () => {
     const on = !get().demoMode;
     set({ demoMode: on });
-    get().toast(on ? 'Live polling paused (demo UI)' : 'Demo stopped', 'info');
+    get().toast(on ? 'Demo mode active — simulating live data' : 'Demo stopped', 'info');
   },
 
   toast: (t, kind) => {
@@ -380,8 +477,42 @@ export const useStore = create<AppState>((set, get) => ({
 
   liveTick: async () => {
     const s = get();
-    if (!s.authed || !s.liveOn || s.demoMode) return;
+    if (!s.authed || !s.liveOn) return;
+    if (s.demoMode) return;
     await s.fetchData();
+  },
+
+  // ── Demo ticks ──
+  demoTickReport: () => {
+    const z = ZONES[Math.floor(Math.random() * 3)];
+    const lv = Math.random() > 0.5 ? 'critical' : 'high';
+    const r: Report = {
+      report_id: 'R' + Math.floor(Math.random() * 9000 + 2000),
+      source_type: 'community',
+      lat: z.c[0][0] - Math.random() * 0.008,
+      lng: z.c[0][1] + Math.random() * 0.012,
+      description: '[Demo] high-risk community report',
+      status: 'analysed',
+      risk_level: lv,
+      confidence: 78 + Math.floor(Math.random() * 20),
+      needs_human_review: false,
+      remediation_action: 'Source reduction + larvicide',
+      site_type: SITES[Math.floor(Math.random() * SITES.length)],
+      larvae_visible: true,
+      guidance_text: 'Empty and scrub the container. Apply larvicide.',
+      ai_analysis: { water_present: true, site_type: 'Container', larvae_visible: true, reasoning: 'Demo synthetic breeding site.' },
+      zone_id: z.zone_id,
+      zone_name: z.name,
+      created_at: new Date().toISOString(),
+      _new: true,
+    };
+    set((s) => ({ reports: [r, ...s.reports].slice(0, 60) }));
+    get().toast('report:analysed — ' + RISK[lv].label + ' in ' + z.name, 'info');
+  },
+
+  demoTickZone: () => {
+    const z = ZONES[Math.floor(Math.random() * ZONES.length)];
+    get().toast('zone:updated — ' + z.name + ' risk ' + (z.risk_score + Math.floor(Math.random() * 6 - 2)), 'info');
   },
 
   demoTickCase: () => {
@@ -396,11 +527,51 @@ export const useStore = create<AppState>((set, get) => ({
       zone_name: cz.n,
       reported_date: new Date().toISOString(),
       age_group: pick(AGES),
-      severity: severity as any,
+      severity,
       hospital: pick(HOSPITALS),
       status: 'active',
     };
     set((s) => ({ cases: [c, ...s.cases] }));
+  },
+
+  demoTickDuplicate: () => {
+    const s = get();
+    const inc = s.incidents[Math.floor(Math.random() * Math.min(6, s.incidents.length))];
+    const conf = 0.72 + Math.random() * 0.16;
+    const pct = Math.round(conf * 100);
+    const dist = 20 + Math.floor(Math.random() * 50);
+    const dec: Decision = {
+      decision_id: uuid(),
+      new_report_id: 'R' + Math.floor(Math.random() * 9000 + 3000),
+      matched_incident_id: inc.incident_id,
+      confidence: conf,
+      decision: 'flagged_review',
+      status: 'pending',
+      ai_reasoning: 'Possible duplicate of ' + inc.code + ' — GPS ' + dist + ' m away, moderate image similarity.',
+      reviewed_by: null,
+      override_reason: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      gps_distance_m: dist,
+      time_diff_h: 1 + Math.floor(Math.random() * 12),
+      new_lat: inc.lat + 0.0005,
+      new_lng: inc.lng + 0.0005,
+    };
+    set((st) => ({ decisions: [dec, ...st.decisions] }));
+    if (s.role === 'ndcu_admin') get().toast('New duplicate flagged for review — confidence ' + pct + '%', 'info');
+  },
+
+  demoTickIncident: () => {
+    const s = get();
+    const inc = s.incidents[Math.floor(Math.random() * Math.min(6, s.incidents.length))];
+    set((st) => ({
+      incidents: st.incidents.map((x) =>
+        x.incident_id === inc.incident_id
+          ? { ...x, confirmation_count: x.confirmation_count + 1, report_count: x.report_count + 1 }
+          : x,
+      ),
+    }));
+    get().toast('incident:updated — ' + inc.code + ' now has ' + (inc.confirmation_count + 1) + ' reports', 'info');
   },
 
   createWO: async (r) => {
@@ -412,6 +583,66 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (err: any) {
       get().toast(err.message || 'Failed to create work order', 'error');
     }
+  },
+
+  createWOFromIncident: (inc) => {
+    const wo: WorkOrder = {
+      wo_id: 'WO' + Math.floor(Math.random() * 900 + 300),
+      status: 'new',
+      priority_score:
+        inc.risk_level === 'critical' ? 90 : inc.risk_level === 'high' ? 72 : inc.risk_level === 'medium' ? 50 : 32,
+      assigned_to: null,
+      lat: inc.lat,
+      lng: inc.lng,
+      zone_name: inc.zone_name,
+      zone_id: inc.zone_id,
+      risk_level: inc.risk_level,
+      confidence: 85,
+      site_type: inc.site_type,
+      remediation_action: 'Source reduction',
+      guidance_text:
+        'Locate the flagged container and remove standing water. Apply larvicide and record before/after photos.',
+      larvae_visible: inc.risk_level === 'critical' || inc.risk_level === 'high',
+      image_url: null,
+      description: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
+      incident_id: inc.incident_id,
+      confirmation_count: inc.confirmation_count,
+      ndcu_instructions: '',
+      notes: '',
+      outcome: null,
+      created_at: new Date().toISOString(),
+    };
+    set((s) => ({ orders: [wo, ...s.orders], selIncident: null }));
+    get().toast('Work order ' + wo.wo_id + ' created for ' + inc.code, 'success');
+  },
+
+  createWOFromTrap: (t, reason) => {
+    const rl = t.readings.larvae_detected ? 'high' : 'medium';
+    const wo: WorkOrder = {
+      wo_id: 'WO' + Math.floor(Math.random() * 900 + 300),
+      status: 'new',
+      priority_score: Math.min(99, 60 + Math.round(t.readings.mosquito_count_24h / 2)),
+      assigned_to: null,
+      lat: t.lat,
+      lng: t.lng,
+      zone_name: t.zone_name,
+      zone_id: t.zone_id,
+      risk_level: rl,
+      confidence: 88,
+      site_type: 'IoT trap alert',
+      remediation_action: 'Inspect trap site',
+      guidance_text:
+        'Inspect the area around trap ' + t.serial_number + '. Reason: ' + reason + '. Check for nearby breeding sources, remove standing water, and verify the trap hardware and battery.',
+      larvae_visible: t.readings.larvae_detected,
+      image_url: null,
+      description: 'Trap ' + t.serial_number + ' (' + t.zone_name + ') — ' + reason,
+      ndcu_instructions: '',
+      notes: '',
+      outcome: null,
+      created_at: new Date().toISOString(),
+    };
+    set((s) => ({ orders: [wo, ...s.orders], activeOrder: wo }));
+    get().toast('Work order ' + wo.wo_id + ' created from ' + t.serial_number, 'success');
   },
 
   dispatch: async (woId, phi, _instr) => {
@@ -506,8 +737,9 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  selectZone: (z) => set({ selZone: z, selPred: null }),
-  selectPrediction: (p) => set({ selPred: p, selZone: null }),
+  selectZone: (z) => set({ selZone: z, selPred: null, selIncident: null }),
+  selectPrediction: (p) => set({ selPred: p, selZone: null, selIncident: null }),
+  selectIncident: (inc) => set({ selIncident: inc, selZone: null, selPred: null }),
   setActiveReport: (r) => set({ activeReport: r }),
   setActiveOrder: (o) => set({ activeOrder: o }),
   setDispatchOrder: (o) => set({ dispatchOrder: o }),
@@ -516,4 +748,156 @@ export const useStore = create<AppState>((set, get) => ({
     try { sessionStorage.setItem('dg_predAlert', '1'); } catch {}
     set({ predAlertDismissed: true });
   },
+
+  // ── predictions panel ──
+  openPredictions: () =>
+    set((s) => {
+      const layers = { ...s.layers, forecast: true };
+      saveLS('dg_layers', layers);
+      return { layers, predPanel: true };
+    }),
+
+  setPredPanel: (predPanel) => set({ predPanel }),
+
+  showPredictionOnMap: (p) =>
+    set((s) => {
+      const layers = { ...s.layers, forecast: true };
+      saveLS('dg_layers', layers);
+      return {
+        layers,
+        predPanel: false,
+        selPred: p,
+        selIncident: null,
+        selZone: null,
+        view: 'dashboard',
+        dashLayout: s.dashLayout === 'stats' ? 'split' : s.dashLayout,
+      };
+    }),
+
+  // ── incidents / duplicates ──
+  setReportFilter: (reportFilter) => set({ reportFilter }),
+  setReportZone: (reportZone) => set({ reportZone }),
+  setReportSev: (reportSev) => set({ reportSev }),
+  setReportSite: (reportSite) => set({ reportSite }),
+  setDupReviewOpen: (dupReviewOpen) => set({ dupReviewOpen }),
+  setIotAlertOpen: (iotAlertOpen) => set({ iotAlertOpen }),
+  setActiveIncident: (id) => set({ activeIncident: id, overrideDec: null }),
+
+  getIncident: (id) => {
+    const s = get();
+    const inc = s.incidents.find((x) => x.incident_id === id);
+    if (!inc) return null;
+    const reports: IncidentReport[] = [];
+    const base = new Date(inc.created_at).getTime();
+    for (let i = 0; i < inc.confirmation_count; i++) {
+      reports.push({
+        report_id: i === 0 ? inc.primary_report_id : inc.code + '-C' + i,
+        role: i === 0 ? 'Community reporter' : ROLES[(i + 1) % ROLES.length],
+        submitted_at: new Date(base + i * 37 * 60000).toISOString(),
+        risk_level: inc.risk_level,
+        confidence: 72 + ((i * 7) % 26),
+        primary: i === 0,
+        site_type: inc.site_type,
+      });
+    }
+    const decisions = s.decisions.filter((d) => d.matched_incident_id === id);
+    return { inc, reports, decisions };
+  },
+
+  setIncidentStatus: (id, status) => {
+    const ts = new Date().toISOString();
+    set((s) => ({
+      incidents: s.incidents.map((x) =>
+        x.incident_id === id
+          ? {
+              ...x,
+              status,
+              verified_at: status === 'verified' && !x.verified_at ? ts : x.verified_at,
+              resolved_at: (status === 'resolved' || status === 'closed') && !x.resolved_at ? ts : x.resolved_at,
+            }
+          : x,
+      ),
+    }));
+    get().toast('Incident marked ' + INC_STATUS[status].label.toLowerCase(), 'success');
+  },
+
+  updateDecision: (id, action, reason) => {
+    set((s) => {
+      const d = s.decisions.find((x) => x.decision_id === id);
+      const decisions = s.decisions.map((x) =>
+        x.decision_id === id
+          ? {
+              ...x,
+              status: (action === 'approve' ? 'approved' : 'overridden') as Decision['status'],
+              reviewed_by: 'O. Abeywardena (NDCU)',
+              override_reason: action === 'override' ? reason || 'Manually overridden' : x.override_reason,
+              reviewed_at: new Date().toISOString(),
+            }
+          : x,
+      );
+      let incidents = s.incidents;
+      if (action === 'approve' && d && d.matched_incident_id) {
+        incidents = incidents.map((x) =>
+          x.incident_id === d.matched_incident_id
+            ? { ...x, confirmation_count: x.confirmation_count + 1, report_count: x.report_count + 1 }
+            : x,
+        );
+      }
+      if (action === 'override' && d) {
+        const matched = d.matched_incident_id
+          ? incidents.find((i) => i.incident_id === d.matched_incident_id)
+          : null;
+        const z = ZONES.find((zz) => zz.zone_id === matched?.zone_id) || ZONES[4];
+        incidents = [
+          {
+            incident_id: uuid(),
+            code: 'INC-' + String(9000 + Math.floor(Math.random() * 900)).slice(-4),
+            status: 'open',
+            risk_level: 'medium',
+            lat: d.new_lat,
+            lng: d.new_lng,
+            zone_id: z.zone_id,
+            zone_name: z.name,
+            confirmation_count: 1,
+            report_count: 1,
+            primary_report_id: d.new_report_id,
+            created_at: new Date().toISOString(),
+            verified_at: null,
+            resolved_at: null,
+            site_type: 'Container',
+          },
+          ...incidents,
+        ];
+      }
+      return { decisions, incidents, overrideDec: null };
+    });
+    get().toast(
+      action === 'approve' ? 'Match confirmed — report attached to incident' : 'New incident created from report',
+      'success',
+    );
+  },
+
+  setOverrideDec: (overrideDec) => set({ overrideDec }),
+  setMergeSource: (mergeSource) => set({ mergeSource, mergeQuery: '' }),
+  setMergeQuery: (mergeQuery) => set({ mergeQuery }),
+
+  mergeIncidents: (srcId, tgtId) => {
+    set((s) => {
+      const src = s.incidents.find((x) => x.incident_id === srcId);
+      const tgt = s.incidents.find((x) => x.incident_id === tgtId);
+      if (!src || !tgt) return { mergeSource: null };
+      const incidents = s.incidents.map((x) =>
+        x.incident_id === tgtId
+          ? { ...x, confirmation_count: x.confirmation_count + src.confirmation_count, report_count: x.report_count + src.report_count }
+          : x.incident_id === srcId
+            ? { ...x, status: 'closed' as IncidentStatus, resolved_at: new Date().toISOString(), mergedInto: tgt.code }
+            : x,
+      );
+      return { incidents, mergeSource: null, mergeQuery: '', activeIncident: tgtId };
+    });
+    get().toast('Incidents merged', 'success');
+  },
 }));
+
+/** Pending duplicate decisions (used by the sidebar badge, dashboard KPI, and review panel). */
+export const pendingDecisions = (decisions: Decision[]): Decision[] => decisions.filter((d) => d.status === 'pending');

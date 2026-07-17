@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import { RISK } from '../../theme';
+import { RISK, PRIMARY } from '../../theme';
 import { tago } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import ReportDrawer from './ReportDrawer';
+import ReviewPanel from './ReviewPanel';
+import IncidentCard from './IncidentCard';
+import IncidentDrawer from './IncidentDrawer';
+import type { Zone } from '../../types';
 
 function isPointInPolygon(pt: [number, number], poly: [number, number][]) {
   const x = pt[0], y = pt[1];
@@ -24,6 +28,7 @@ export default function Reports() {
   const setActiveReport = useStore((s) => s.setActiveReport);
   const selZone = useStore((s) => s.selZone);
   const selectZone = useStore((s) => s.selectZone);
+  const [tab, setTab] = useState<'reports' | 'incidents'>('incidents');
 
   // Filter reports by selected boundary polygon if applicable
   const filteredReports = selZone
@@ -45,12 +50,39 @@ export default function Reports() {
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
-        background: '#fff',
-        borderRadius: 12,
-        border: '1px solid #e2e8e5',
-        overflow: 'hidden',
+        gap: 12,
       }}
     >
+      <ReviewPanel />
+
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {(['incidents', 'reports'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            style={{ padding: '7px 14px', border: '1px solid ' + (tab === t ? PRIMARY : '#dfe6e3'), borderRadius: 20, background: tab === t ? PRIMARY : '#fff', color: tab === t ? '#fff' : '#6b7c77', cursor: 'pointer', fontFamily: 'Inter', fontSize: 12.5, fontWeight: 600 }}
+          >
+            {t === 'incidents' ? 'Incident Feed' : 'Raw Reports'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'incidents' ? (
+        <IncidentFeed selZone={selZone} selectZone={selectZone} />
+      ) : (
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          background: '#fff',
+          borderRadius: 12,
+          border: '1px solid #e2e8e5',
+          overflow: 'hidden',
+        }}
+      >
       <div
         style={{
           padding: '13px 16px',
@@ -145,6 +177,43 @@ export default function Reports() {
       </div>
 
       {activeReport && <ReportDrawer />}
+      {/* IncidentDrawer rendered at root via AppShell */}
+    </div>
+    )}
+    </div>
+  );
+}
+
+function IncidentFeed({ selZone, selectZone }: { selZone: Zone | null; selectZone: (z: Zone | null) => void }) {
+  const incidents = useStore((s) => s.incidents);
+  const activeIncident = useStore((s) => s.activeIncident);
+  const RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  const list = incidents
+    .filter((i) => !selZone || i.zone_id === selZone.zone_id || i.zone_name === selZone.name)
+    .slice()
+    .sort((a, b) => RANK[a.risk_level] - RANK[b.risk_level] || +new Date(b.created_at) - +new Date(a.created_at));
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: '#fff', borderRadius: 12, border: '1px solid #e2e8e5', overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #eef1f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>Incident Feed</span>
+          {selZone && (
+            <span onClick={() => selectZone(null)} style={{ fontSize: 12, background: '#0b6b57', color: '#fff', padding: '2px 8px', borderRadius: 12, cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Zone: {selZone.name} ✕
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 12, color: '#94a29d' }}>{list.length} incidents</span>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {list.length ? (
+          list.map((inc) => <IncidentCard key={inc.incident_id} inc={inc} />)
+        ) : (
+          <div style={{ padding: '28px', textAlign: 'center', fontSize: 13, color: '#94a29d' }}>No incidents match this filter.</div>
+        )}
+      </div>
+      {activeIncident && <IncidentDrawer />}
     </div>
   );
 }

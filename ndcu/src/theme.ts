@@ -1,4 +1,14 @@
-import type { AlertLevel, RiskLevel, RiskTrend, Severity } from './types';
+import type {
+  AlertLevel,
+  DecisionStatus,
+  DecisionType,
+  IncidentStatus,
+  RiskLevel,
+  RiskTrend,
+  Severity,
+  Species,
+  TrapStatus,
+} from './types';
 
 export const PRIMARY = '#0D4A3E';
 export const AMBER = '#F59E0B';
@@ -33,6 +43,36 @@ export interface PredBand {
   op: number;
   pulse?: boolean;
 }
+
+export const INC_STATUS: Record<IncidentStatus, { c: string; bg: string; label: string }> = {
+  open: { c: '#3B82F6', bg: '#ECF3FE', label: 'Open' },
+  verified: { c: '#8B5CF6', bg: '#F1EDFE', label: 'Verified' },
+  resolved: { c: '#10B981', bg: '#E7F7F0', label: 'Resolved' },
+  closed: { c: '#6b7c77', bg: '#eef1f0', label: 'Closed' },
+};
+
+export const DEC_TYPE: Record<DecisionType, { c: string; bg: string; label: string }> = {
+  auto_attached: { c: '#10B981', bg: '#E7F7F0', label: 'Auto-attached' },
+  flagged_review: { c: '#F59E0B', bg: '#FEF5E6', label: 'Flagged for review' },
+  new_incident: { c: '#3B82F6', bg: '#ECF3FE', label: 'New incident' },
+};
+
+export const DEC_STATUS: Record<DecisionStatus, { c: string; bg: string; label: string }> = {
+  pending: { c: '#F59E0B', bg: '#FEF5E6', label: 'Pending' },
+  approved: { c: '#10B981', bg: '#E7F7F0', label: 'Approved' },
+  overridden: { c: '#8B5CF6', bg: '#F1EDFE', label: 'Overridden' },
+};
+
+export const TRAP_STATUS: Record<TrapStatus, { c: string; label: string }> = {
+  active: { c: '#0F6E56', label: 'Active' },
+  offline: { c: '#888780', label: 'Offline' },
+  maintenance: { c: '#F59E0B', label: 'Maintenance' },
+};
+
+export const SPECIES_LABEL: Record<Species, string> = {
+  aedes_aegypti: 'Ae. aegypti',
+  aedes_albopictus: 'Ae. albopictus',
+};
 
 /** Choropleth band for an outbreak probability, or null to draw nothing. */
 export const PRED_BAND = (p: number): PredBand | null =>

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { PRIMARY } from '../../theme';
 import { useStore } from '../../store/useStore';
 import { filteredCases } from '../../utils/cases';
-import type { CaseView, LayerKey } from '../../types';
+import type { CaseView, LayerKey, TrapView } from '../../types';
 
 const DAY = 864e5;
 
@@ -28,6 +28,8 @@ export default function LayerToggle() {
   const toggleLayer = useStore((s) => s.toggleLayer);
   const caseView = useStore((s) => s.caseView);
   const setCaseView = useStore((s) => s.setCaseView);
+  const trapView = useStore((s) => s.trapView);
+  const setTrapView = useStore((s) => s.setTrapView);
   const dateFrom = useStore((s) => s.dateFrom);
   const dateTo = useStore((s) => s.dateTo);
   const setDateRange = useStore((s) => s.setDateRange);
@@ -92,6 +94,28 @@ export default function LayerToggle() {
     </button>
   );
 
+  const tseg = (v: TrapView, lbl: string) => (
+    <button
+      key={v}
+      onClick={() => setTrapView(v)}
+      style={{
+        flex: 1,
+        padding: '5px 8px',
+        border: 'none',
+        borderRadius: 5,
+        cursor: 'pointer',
+        fontFamily: 'Inter',
+        fontSize: 11.5,
+        fontWeight: 600,
+        background: trapView === v ? '#fff' : 'transparent',
+        color: trapView === v ? PRIMARY : '#94a29d',
+        boxShadow: trapView === v ? '0 1px 2px rgba(0,0,0,.1)' : 'none',
+      }}
+    >
+      {lbl}
+    </button>
+  );
+
   return (
     <div
       style={{
@@ -112,6 +136,16 @@ export default function LayerToggle() {
       <Hdr>Current data</Hdr>
       {row('community', 'Breeding site reports', PRIMARY)}
       {row('zones', 'Zone risk heatmap')}
+      {row('traps', 'IoT trap network', '#0F6E56')}
+      {layers.traps && (
+        <div style={{ margin: '2px 0 6px 22px' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#94a29d', marginBottom: 4 }}>View</div>
+          <div style={{ display: 'flex', gap: 3, background: '#f0f3f2', padding: 3, borderRadius: 7 }}>
+            {tseg('traps', 'Traps')}
+            {tseg('heatmap', 'Heatmap')}
+          </div>
+        </div>
+      )}
       <Hdr>Analysis layers</Hdr>
       {row('cases', 'Dengue cases')}
       {layers.cases && (

@@ -8,11 +8,13 @@ import type {
   Polygon,
 } from 'leaflet';
 import L from '../../lib/leaflet';
-import { CASE_SEV, PRED_BAND, RISK } from '../../theme';
+import { CASE_SEV, PRED_BAND, RISK, TRAP_STATUS } from '../../theme';
 import { CENTER, PREDICTIONS } from '../../data/zones';
 import { filteredCases } from '../../utils/cases';
 import { casePopupHTML } from './casePopup';
+import { trapPopupHTML } from './trapPopup';
 import { useStore } from '../../store/useStore';
+import IncidentPopup from './IncidentPopup';
 import type { Report, WorkOrder, Zone } from '../../types';
 
 const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
@@ -147,6 +149,8 @@ export default function MapView() {
   const zoneLayerRef = useRef<LayerGroup | null>(null);
   const pinLayerRef = useRef<LayerGroup | null>(null);
   const predLayerRef = useRef<LayerGroup | null>(null);
+  const trapLayerRef = useRef<LayerGroup | null>(null);
+  const trapHeatRef = useRef<HeatLayer | null>(null);
   const caseLayerRef = useRef<LayerGroup | MarkerClusterGroup | null>(null);
   const caseIsClusterRef = useRef(false);
   const heatRef = useRef<HeatLayer | null>(null);
@@ -161,15 +165,20 @@ export default function MapView() {
 
   // Store slices the map reacts to.
   const view = useStore((s) => s.view);
+  const dashLayout = useStore((s) => s.dashLayout);
   const layers = useStore((s) => s.layers);
   const reports = useStore((s) => s.reports);
   const orders = useStore((s) => s.orders);
+  const incidents = useStore((s) => s.incidents);
+  const traps = useStore((s) => s.traps);
+  const trapView = useStore((s) => s.trapView);
   const cases = useStore((s) => s.cases);
   const caseView = useStore((s) => s.caseView);
   const dateFrom = useStore((s) => s.dateFrom);
   const dateTo = useStore((s) => s.dateTo);
   const selectZone = useStore((s) => s.selectZone);
   const selectPrediction = useStore((s) => s.selectPrediction);
+  const selectIncident = useStore((s) => s.selectIncident);
   const setActiveReport = useStore((s) => s.setActiveReport);
   const setActiveOrder = useStore((s) => s.setActiveOrder);
 
@@ -185,8 +194,21 @@ export default function MapView() {
     zoneLayerRef.current = L.layerGroup().addTo(map);
     pinLayerRef.current = L.layerGroup().addTo(map);
     predLayerRef.current = L.layerGroup().addTo(map);
+    try {
+      map.createPane('trapPane');
+      const pane = map.getPane('trapPane');
+      if (pane) pane.style.zIndex = '450';
+    } catch { /* ignore */ }
+    trapLayerRef.current = L.layerGroup().addTo(map);
     caseLayerRef.current = null;
     caseIsClusterRef.current = false;
+
+    // bridge for the "View zone reports" link inside trap popups
+    (window as unknown as { __dgViewZoneReports?: () => void }).__dgViewZoneReports = () => {
+      map.closePopup();
+      useStore.getState().setView('reports');
+    };
+
     setReady(true);
 
     // Zoom listener to trigger state-based styling recomputes
@@ -202,11 +224,13 @@ export default function MapView() {
         clearInterval(pulseTimerRef.current);
         pulseTimerRef.current = null;
       }
+      delete (window as unknown as { __dgViewZoneReports?: () => void }).__dgViewZoneReports;
       map.off('zoomend', onZoom);
       map.remove();
       mapRef.current = null;
       caseLayerRef.current = null;
       heatRef.current = null;
+      trapHeatRef.current = null;
       setReady(false);
     };
   }, []);
@@ -296,30 +320,52 @@ export default function MapView() {
     });
   }, [ready, layers.zones, zones, cases, zoom, boundaryCache, selectZone]);
 
-  // ---- report / work-order pins ----
+  // ---- pins: incidents (dashboard/reports) or work orders ----
   useEffect(() => {
     const g = pinLayerRef.current;
     if (!ready || !g) return;
     g.clearLayers();
-    const isWO = view === 'workorders';
-    const pool: Array<Report | WorkOrder> = isWO ? orders : reports;
-    if (!isWO && layers.community === false) return;
-    pool.forEach((r) => {
-      const col = RISK[r.risk_level].c;
-      const icon = L.divIcon({
-        className: '',
-        html: `<div class="dg-leaf-pin" style="width:14px;height:14px;background:${col}"></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
-      });
-      L.marker([r.lat, r.lng], { icon })
-        .addTo(g)
-        .on('click', () => {
-          if (isWO) setActiveOrder(r as WorkOrder);
-          else setActiveReport(r as Report);
+    if (view === 'workorders') {
+      orders.forEach((o) => {
+        const col = RISK[o.risk_level].c;
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="dg-leaf-pin" style="width:14px;height:14px;background:${col}"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
         });
+        L.marker([o.lat, o.lng], { icon }).addTo(g).on('click', () => setActiveOrder(o as WorkOrder));
+      });
+      return;
+    }
+    // Show incident pins on dashboard/reports views
+    if (layers.community === false) {
+      // fallback: show individual report pins
+      reports.forEach((r) => {
+        const col = RISK[r.risk_level].c;
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="dg-leaf-pin" style="width:14px;height:14px;background:${col}"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        });
+        L.marker([r.lat, r.lng], { icon }).addTo(g).on('click', () => setActiveReport(r as Report));
+      });
+      return;
+    }
+    // Show incident pins with confirmation badge
+    incidents.forEach((inc) => {
+      const col = RISK[inc.risk_level].c;
+      const op = inc.status === 'resolved' ? 0.5 : inc.status === 'closed' ? 0.3 : 1;
+      const badge =
+        inc.confirmation_count > 1
+          ? `<span style="position:absolute;top:-6px;right:-6px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#0f2d27;color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff;box-sizing:border-box">${inc.confirmation_count}</span>`
+          : '';
+      const html = `<div style="position:relative;width:16px;height:16px;opacity:${op}"><div style="width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;background:${col};box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>${badge}</div>`;
+      const icon = L.divIcon({ className: '', html, iconSize: [16, 16], iconAnchor: [8, 8] });
+      L.marker([inc.lat, inc.lng], { icon }).addTo(g).on('click', () => selectIncident(inc));
     });
-  }, [ready, layers.community, view, reports, orders, setActiveOrder, setActiveReport]);
+  }, [ready, layers.community, view, incidents, reports, orders, selectIncident, setActiveOrder, setActiveReport]);
 
   // ---- outbreak-forecast bands (with pulse animation for emergency zones) ----
   useEffect(() => {
@@ -363,6 +409,47 @@ export default function MapView() {
       }
     };
   }, [ready, layers.forecast, selectPrediction]);
+
+  // ---- IoT traps (hex markers / heatmap) ----
+  useEffect(() => {
+    const map = mapRef.current;
+    const g = trapLayerRef.current;
+    if (!ready || !map || !g) return;
+    g.clearLayers();
+    if (trapHeatRef.current) {
+      map.removeLayer(trapHeatRef.current);
+      trapHeatRef.current = null;
+    }
+    if (!layers.traps) return;
+    if (trapView === 'heatmap' && typeof L.heatLayer === 'function') {
+      const mx = Math.max(1, ...traps.map((t) => t.readings.mosquito_count_24h));
+      const pts = traps.map((t) => [t.lat, t.lng, t.readings.mosquito_count_24h / mx] as [number, number, number]);
+      trapHeatRef.current = L.heatLayer(pts, {
+        radius: 25,
+        blur: 20,
+        maxZoom: 13,
+        gradient: { 0.2: '#2563EB', 0.4: '#60A5FA', 0.6: '#F59E0B', 0.8: '#FB923C', 1.0: '#DC2626' },
+      }).addTo(map);
+      return;
+    }
+    traps.forEach((t) => {
+      const col = TRAP_STATUS[t.status].c;
+      const low = t.battery_percent < 20;
+      const hex = `<svg width="20" height="20" viewBox="0 0 20 20" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))"><polygon points="10,1.5 17.5,5.75 17.5,14.25 10,18.5 2.5,14.25 2.5,5.75" fill="${col}" stroke="#fff" stroke-width="1.6"/></svg>`;
+      const dot = low
+        ? `<span style="position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#DC2626;border:1.5px solid #fff"></span>`
+        : '';
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="position:relative;width:20px;height:20px">${hex}${dot}</div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+      const m = L.marker([t.lat, t.lng], { icon, pane: 'trapPane' });
+      m.bindPopup(trapPopupHTML(t), { maxWidth: 250, minWidth: 230 });
+      g.addLayer(m);
+    });
+  }, [ready, layers.traps, trapView, traps]);
 
   // ---- confirmed dengue cases (cluster / heatmap) ----
   useEffect(() => {
@@ -432,7 +519,7 @@ export default function MapView() {
     if (!ready) return;
     const id = window.setTimeout(() => mapRef.current?.invalidateSize(), 80);
     return () => window.clearTimeout(id);
-  }, [ready, view]);
+  }, [ready, view, dashLayout]);
 
   // Get active tier details for the legend overlay
   const getActiveTier = () => {
@@ -472,6 +559,9 @@ export default function MapView() {
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Incident popup */}
+      <IncidentPopup />
 
       {/* Floating Legend Panel - Syncs dynamically with active zoom tier in bottom-right */}
       <div

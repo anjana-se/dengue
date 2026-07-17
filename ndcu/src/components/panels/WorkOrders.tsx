@@ -3,6 +3,7 @@ import { RISK } from '../../theme';
 import { tago } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import type { WorkOrderStatus } from '../../types';
+import IotAlertPanel from './IotAlertPanel';
 
 const STATUS_PILL: Record<WorkOrderStatus, [string, string, string]> = {
   new: ['#3B82F6', '#ECF3FE', 'New'],
@@ -66,12 +67,22 @@ export default function WorkOrders() {
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
-        background: '#fff',
-        borderRadius: 12,
-        border: '1px solid #e2e8e5',
-        overflow: 'hidden',
+        gap: 12,
       }}
     >
+      <IotAlertPanel />
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          background: '#fff',
+          borderRadius: 12,
+          border: '1px solid #e2e8e5',
+          overflow: 'hidden',
+        }}
+      >
       {/* Header */}
       <div
         style={{
@@ -217,6 +228,7 @@ export default function WorkOrders() {
           </table>
         )}
       </div>
+    </div>
     </div>
   );
 }
