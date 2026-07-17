@@ -8,6 +8,7 @@ import {
   type CreateReportInput as DbCreateReportInput,
 } from '../../db/queries/reports.queries';
 import { findZoneByCoordinates } from '../../db/queries/zones.queries';
+import { query as dbQuery } from '../../db/client';
 import { extractGps, isWithinSriLanka } from './exif.util';
 import { getStorage } from '../../storage';
 import { config } from '../../config/env';
@@ -85,14 +86,10 @@ export async function createReportService(input: CreateReportServiceInput): Prom
     }
   }
 
-  // ── Step 2: Auto-assign zone from coordinates (PostGIS lookup) ───────────
+  // ── Step 2: Auto-assign zone from coordinates (NSDI MapServer / PostGIS) ───
   let zoneId = input.zone_id ?? null;
   if (!zoneId && latitude != null && longitude != null) {
-    const zone = await findZoneByCoordinates(latitude, longitude);
-    if (zone) {
-      zoneId = zone.id;
-      logger.debug('Zone auto-assigned from GPS', { zoneId, zoneName: zone.name });
-    }
+    zoneId = await resolveZoneFromCoordinates(Number(latitude), Number(longitude));
   }
 
   // ── Step 3: Upload image to storage ─────────────────────────────────────
@@ -228,6 +225,56 @@ export async function geocodeCoordinatesService(lat: number, lng: number): Promi
 
   const promise = (async () => {
     const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    
+    // Try NSDI MapServer identify endpoint first (Layer 1: Grama Niladhari Division)
+    try {
+      const geom = `${lng},${lat}`;
+      const url = `https://gisapps.nsdi.gov.lk/server/rest/services/Srilanka/Boundaries/MapServer/identify`
+        + `?geometry=${geom}`
+        + `&geometryType=esriGeometryPoint`
+        + `&sr=4326`
+        + `&layers=all:1`
+        + `&tolerance=8`
+        + `&mapExtent=${lng - 0.015},${lat - 0.015},${lng + 0.015},${lat + 0.015}`
+        + `&imageDisplay=800,600,96`
+        + `&returnGeometry=false`
+        + `&f=json`;
+
+      const res = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'DengueGuard-App/1.0.0',
+        },
+      });
+
+      if (res.ok) {
+        const data: any = await res.json();
+        if (data && data.results && data.results.length > 0) {
+          const feature = data.results[0];
+          const attrs = feature.attributes || {};
+          const gndName = attrs["GND Name"] || attrs.gnd_name || feature.value;
+          const district = attrs["District Name"] || attrs.district_name || 'COLOMBO';
+          
+          if (gndName) {
+            let finalName = gndName;
+            const cleanDistrict = toTitleCase(district);
+            if (finalName.toLowerCase() === 'fort' && cleanDistrict.toLowerCase() === 'colombo') {
+              finalName = 'Colombo Fort';
+            } else {
+              finalName = toTitleCase(finalName);
+            }
+            
+            const result = `${cleanDistrict} — ${finalName}`;
+            geocodeCache.set(key, result);
+            return result;
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to geocode via NSDI MapServer, falling back to Nominatim', { lat, lng, error: (err as Error).message });
+    }
+
+    // Fallback to Nominatim
     try {
       const url = new URL('https://nominatim.openstreetmap.org/reverse');
       url.searchParams.set('format', 'jsonv2');
@@ -268,4 +315,102 @@ export async function geocodeCoordinatesService(lat: number, lng: number): Promi
 
   inflightGeocodes.set(key, promise);
   return promise;
+}
+
+/**
+ * Resolves a coordinate to a specific Grama Niladhari zone by querying the NSDI Survey Department MapServer.
+ * If the zone doesn't exist in the database, it inserts it dynamically with its geometries.
+ */
+export async function resolveZoneFromCoordinates(lat: number, lng: number): Promise<string | null> {
+  const NSDI_SERVICE = 'https://gisapps.nsdi.gov.lk/server/rest/services/Srilanka/Boundaries/MapServer';
+  
+  const geom = `${lng},${lat}`;
+  const url = `${NSDI_SERVICE}/identify`
+    + `?geometry=${geom}`
+    + `&geometryType=esriGeometryPoint`
+    + `&sr=4326`
+    + `&layers=all:1`
+    + `&tolerance=8`
+    + `&mapExtent=${lng - 0.015},${lat - 0.015},${lng + 0.015},${lat + 0.015}`
+    + `&imageDisplay=800,600,96`
+    + `&returnGeometry=true`
+    + `&f=json`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'DengueGuard-App/1.0.0',
+      },
+    });
+
+    if (res.ok) {
+      const data: any = await res.json();
+      if (data && data.results && data.results.length > 0) {
+        const feature = data.results[0];
+        const geometry = feature.geometry;
+        const attrs = feature.attributes || {};
+        
+        const gndName = attrs["GND Name"] || attrs.gnd_name || feature.value;
+        const district = attrs["District Name"] || attrs.district_name || 'COLOMBO';
+        const province = attrs["Province Name"] || attrs.province_name || 'WESTERN';
+        
+        if (gndName && geometry && geometry.rings && geometry.rings.length > 0) {
+          let name = gndName;
+          const cleanDistrict = toTitleCase(district);
+          const cleanProvince = toTitleCase(province);
+          
+          if (name.toLowerCase() === 'fort' && cleanDistrict.toLowerCase() === 'colombo') {
+            name = 'Colombo Fort';
+          } else {
+            name = toTitleCase(name);
+          }
+
+          // Check if the zone already exists in DB (case-insensitive on name & district)
+          const dbResult = await dbQuery<{ id: string }>(
+            `SELECT id FROM zones WHERE LOWER(name) = LOWER($1) AND LOWER(district) = LOWER($2) LIMIT 1`,
+            [name, cleanDistrict]
+          );
+          
+          if (dbResult.rows.length > 0) {
+            return dbResult.rows[0].id;
+          }
+          
+          // Otherwise format the rings as MultiPolygon WKT and insert
+          const rings = geometry.rings as number[][][];
+          const polys = rings.map(ring => {
+            const points = ring.map(pt => `${pt[0]} ${pt[1]}`).join(', ');
+            return `((${points}))`;
+          });
+          const wkt = `MULTIPOLYGON(${polys.join(', ')})`;
+          
+          const insertResult = await dbQuery<{ id: string }>(
+            `INSERT INTO zones (name, district, province, geom, risk_score, risk_level, active_report_count)
+             VALUES ($1, $2, $3, ST_GeomFromText($4, 4326), 0, 'low', 0)
+             RETURNING id`,
+            [name, cleanDistrict, cleanProvince, wkt]
+          );
+          
+          logger.info('Dynamically created new GN zone from NSDI MapServer', { zoneId: insertResult.rows[0].id, name, district: cleanDistrict });
+          return insertResult.rows[0].id;
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.warn('Failed to resolve GN zone from NSDI MapServer', { lat, lng, error: err.message });
+  }
+
+  // Fallback to PostGIS database lookup
+  try {
+    const zone = await findZoneByCoordinates(lat, lng);
+    if (zone) return zone.id;
+  } catch (err: any) {
+    logger.error('Fallback PostGIS zone lookup failed', { error: err.message });
+  }
+
+  return null;
+}
+
+function toTitleCase(str: string): string {
+  return str.toLowerCase().replace(/(?:^|\s|-)\S/g, (m) => m.toUpperCase());
 }
