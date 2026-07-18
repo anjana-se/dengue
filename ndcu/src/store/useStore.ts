@@ -239,14 +239,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   reports: [],
   orders: [],
-  cases: mkCases(60),
+  cases: [],
   missions: [],
   zones: [],
   staffUsers: [],
   dashboardSummary: null,
-  incidents: INCIDENTS,
-  decisions: DECISIONS,
-  traps: mkTraps(),
+  incidents: [],
+  decisions: [],
+  traps: [],
 
   activeReport: null,
   activeOrder: null,
@@ -399,10 +399,29 @@ export const useStore = create<AppState>((set, get) => ({
 
       let missions: any[] = [];
       let dashboardSummary: any = null;
+      let cases: any[] = [];
+      let traps: any[] = [];
+      let incidents: any[] = [];
+      let decisions: any[] = [];
 
       if (role === 'ndcu_admin') {
         [missions] = await Promise.all([api.getDroneMissions()]);
         try { dashboardSummary = await api.getDashboardSummary(); } catch {}
+      }
+
+      try {
+        const [c, t, incs, decs] = await Promise.all([
+          api.getCases(),
+          api.getTraps(),
+          api.getIncidents(),
+          api.getDuplicateDecisions()
+        ]);
+        cases = c;
+        traps = t;
+        incidents = incs;
+        decisions = decs;
+      } catch (err: any) {
+        console.error('Failed to fetch additional operational layers:', err);
       }
 
       set({
@@ -410,6 +429,10 @@ export const useStore = create<AppState>((set, get) => ({
         reports,
         orders,
         dashboardSummary,
+        cases,
+        traps,
+        incidents,
+        decisions,
         missions: missions.map((m: any) => ({
           mission_id: m.id,
           mission_name: m.name,
@@ -804,77 +827,28 @@ export const useStore = create<AppState>((set, get) => ({
     return { inc, reports, decisions };
   },
 
-  setIncidentStatus: (id, status) => {
-    const ts = new Date().toISOString();
-    set((s) => ({
-      incidents: s.incidents.map((x) =>
-        x.incident_id === id
-          ? {
-              ...x,
-              status,
-              verified_at: status === 'verified' && !x.verified_at ? ts : x.verified_at,
-              resolved_at: (status === 'resolved' || status === 'closed') && !x.resolved_at ? ts : x.resolved_at,
-            }
-          : x,
-      ),
-    }));
-    get().toast('Incident marked ' + INC_STATUS[status].label.toLowerCase(), 'success');
+  setIncidentStatus: async (id, status) => {
+    try {
+      await api.updateIncidentStatus(id, status);
+      get().toast('Incident marked ' + INC_STATUS[status].label.toLowerCase(), 'success');
+      await get().fetchData();
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to update incident status', 'error');
+    }
   },
 
-  updateDecision: (id, action, reason) => {
-    set((s) => {
-      const d = s.decisions.find((x) => x.decision_id === id);
-      const decisions = s.decisions.map((x) =>
-        x.decision_id === id
-          ? {
-              ...x,
-              status: (action === 'approve' ? 'approved' : 'overridden') as Decision['status'],
-              reviewed_by: 'O. Abeywardena (NDCU)',
-              override_reason: action === 'override' ? reason || 'Manually overridden' : x.override_reason,
-              reviewed_at: new Date().toISOString(),
-            }
-          : x,
+  updateDecision: async (id, action, reason) => {
+    try {
+      const backendAction = action === 'approve' ? 'merge' : 'separate';
+      await api.resolveDuplicateDecision(id, backendAction, reason || undefined);
+      get().toast(
+        action === 'approve' ? 'Match confirmed — report attached to incident' : 'New incident created from report',
+        'success',
       );
-      let incidents = s.incidents;
-      if (action === 'approve' && d && d.matched_incident_id) {
-        incidents = incidents.map((x) =>
-          x.incident_id === d.matched_incident_id
-            ? { ...x, confirmation_count: x.confirmation_count + 1, report_count: x.report_count + 1 }
-            : x,
-        );
-      }
-      if (action === 'override' && d) {
-        const matched = d.matched_incident_id
-          ? incidents.find((i) => i.incident_id === d.matched_incident_id)
-          : null;
-        const z = ZONES.find((zz) => zz.zone_id === matched?.zone_id) || ZONES[4];
-        incidents = [
-          {
-            incident_id: uuid(),
-            code: 'INC-' + String(9000 + Math.floor(Math.random() * 900)).slice(-4),
-            status: 'open',
-            risk_level: 'medium',
-            lat: d.new_lat,
-            lng: d.new_lng,
-            zone_id: z.zone_id,
-            zone_name: z.name,
-            confirmation_count: 1,
-            report_count: 1,
-            primary_report_id: d.new_report_id,
-            created_at: new Date().toISOString(),
-            verified_at: null,
-            resolved_at: null,
-            site_type: 'Container',
-          },
-          ...incidents,
-        ];
-      }
-      return { decisions, incidents, overrideDec: null };
-    });
-    get().toast(
-      action === 'approve' ? 'Match confirmed — report attached to incident' : 'New incident created from report',
-      'success',
-    );
+      await get().fetchData();
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to resolve duplicate decision', 'error');
+    }
   },
 
   setOverrideDec: (overrideDec) => set({ overrideDec }),

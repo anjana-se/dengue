@@ -15,6 +15,9 @@ import { zonesRouter } from './services/zones/zones.routes';
 import { droneRouter } from './services/drone/drone.routes';
 import { chatRouter } from './services/chat/chat.routes';
 import { dashboardRouter } from './services/dashboard/dashboard.routes';
+import casesRouter from './services/cases/cases.routes';
+import trapsRouter from './services/traps/traps.routes';
+import incidentsRouter from './services/incidents/incidents.routes';
 
 /**
  * app.ts — Express application assembly.
@@ -69,6 +72,10 @@ export function createApp() {
   app.use(`${config.API_BASE_PATH}/drone`, droneRouter);            // ✅ Step 7
   app.use(`${config.API_BASE_PATH}/chat`, chatRouter);              // ✅ Step 8
   app.use(`${config.API_BASE_PATH}/dashboard`, dashboardRouter);    // ✅ Step 9
+  app.use(`${config.API_BASE_PATH}/cases`, casesRouter);
+  app.use(`${config.API_BASE_PATH}/traps`, trapsRouter);
+  app.use(`${config.API_BASE_PATH}/incidents`, incidentsRouter);
+
 
   // ─── 404 fallback ────────────────────────────────────────────────────────────
   app.use((_req: Request, res: Response) => {

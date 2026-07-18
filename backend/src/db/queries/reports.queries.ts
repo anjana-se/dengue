@@ -206,3 +206,19 @@ export async function getReportCountByZone(
   );
   return parseInt(result.rows[0]?.count ?? '0', 10);
 }
+
+export async function updateReportIncident(
+  reportId: string,
+  incidentId: string | null,
+): Promise<Report> {
+  const result = await query<Report>(
+    `UPDATE reports SET
+       incident_id = $1,
+       updated_at = NOW()
+     WHERE id = $2
+     RETURNING *`,
+    [incidentId, reportId],
+  );
+  return result.rows[0];
+}
+

@@ -8,7 +8,7 @@ import { logger } from '../../shared/logger';
 import { analyzeBreedingSiteImage } from '../../integrations/gemini/visionAnalysis';
 import { analyzeBreedingSiteImageNvidia } from '../../integrations/nvidia/visionAnalysis';
 import { resizeImage, cleanupProcessedFile } from '../../imageProcessing/resize.util';
-import { updateReportAnalysis, updateReportStatus } from '../../db/queries/reports.queries';
+import { updateReportAnalysis, updateReportStatus, findReportById, updateReportIncident } from '../../db/queries/reports.queries';
 import { createWorkOrder } from '../../db/queries/workorders.queries';
 import { recomputeZoneRisk } from '../../services/zones/zones.service';
 import {
@@ -17,7 +17,12 @@ import {
   emitZoneUpdated,
 } from '../../services/notifications/notifications.service';
 import { findZoneById } from '../../db/queries/zones.queries';
+import { findNearbyIncident, createIncident, createDecision, updateIncidentStats } from '../../db/queries/incidents.queries';
+import { compareReportsNvidia } from '../../integrations/nvidia/duplicateComparison';
+import { getIO } from '../../services/notifications/socket.server';
 import type { AiAnalysisJobData } from '../../types/domain.types';
+
+
 
 /**
  * ai/queue/consumer.ts — BullMQ worker: the core AI processing loop.
@@ -115,9 +120,9 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
       : await analyzeBreedingSiteImage(processedImagePath, 'image/jpeg');
 
     // ── 5 + 6. Persist analysis result ────────────────────────────────────
-    const finalStatus = analysis.needs_human_review ? 'needs_human_review' : 'complete';
+    let finalStatus = analysis.needs_human_review ? 'needs_human_review' : 'complete';
 
-    const updatedReport = await updateReportAnalysis({
+    let updatedReport = await updateReportAnalysis({
       report_id,
       status: finalStatus,
       site_type: analysis.site_type,
@@ -138,12 +143,167 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
       confidence: analysis.confidence_score,
     });
 
+    // ── 7. PostGIS Duplicate Detection & Incident Assignment ─────────────────
+    let incidentId: string | null = null;
+
+    if (updatedReport.latitude && updatedReport.longitude) {
+      // Find nearby open incident within 50 meters
+      const nearbyIncident = await findNearbyIncident(
+        Number(updatedReport.latitude),
+        Number(updatedReport.longitude),
+        50
+      );
+
+      if (nearbyIncident) {
+        logger.info('Found nearby open incident for duplicate check', { nearbyIncidentId: nearbyIncident.id });
+        
+        // Fetch matched incident primary report
+        const primaryReport = await findReportById(nearbyIncident.primary_report_id);
+        
+        if (primaryReport) {
+          // Compare using NVIDIA NIM VLM
+          const comparison = await compareReportsNvidia(
+            {
+              site_type: primaryReport.site_type || 'other',
+              description: primaryReport.notes || '',
+              latitude: Number(primaryReport.latitude),
+              longitude: Number(primaryReport.longitude),
+              image_url: primaryReport.image_url,
+            },
+            {
+              site_type: updatedReport.site_type || 'other',
+              description: updatedReport.notes || '',
+              latitude: Number(updatedReport.latitude),
+              longitude: Number(updatedReport.longitude),
+              image_url: updatedReport.image_url,
+            }
+          );
+
+          const timeDiff = Math.abs(new Date(updatedReport.created_at).getTime() - new Date(primaryReport.created_at).getTime()) / 3600000;
+
+          if (comparison.duplicate && comparison.confidence >= 0.90) {
+            // Auto-attach
+            logger.info('Auto-attaching report to matched incident', { reportId: report_id, incidentId: nearbyIncident.id });
+            await updateReportIncident(report_id, nearbyIncident.id);
+            incidentId = nearbyIncident.id;
+
+            await createDecision({
+              new_report_id: report_id,
+              matched_incident_id: nearbyIncident.id,
+              confidence: comparison.confidence,
+              decision: 'auto_attached',
+              status: 'approved',
+              ai_reasoning: comparison.reasoning,
+              gps_distance_m: Number(nearbyIncident.distance) || 0.0,
+              time_diff_h: timeDiff,
+              new_lat: Number(updatedReport.latitude),
+              new_lng: Number(updatedReport.longitude),
+            });
+
+            await updateIncidentStats(nearbyIncident.id);
+          } else if (comparison.confidence >= 0.70) {
+            // Flag for review
+            logger.info('Flagging report for duplicate review', { reportId: report_id, incidentId: nearbyIncident.id });
+            
+            // Set status to needs_human_review and attach
+            finalStatus = 'needs_human_review';
+            updatedReport = await updateReportAnalysis({
+              report_id,
+              status: finalStatus,
+            });
+            await updateReportIncident(report_id, nearbyIncident.id);
+            incidentId = nearbyIncident.id;
+
+            await createDecision({
+              new_report_id: report_id,
+              matched_incident_id: nearbyIncident.id,
+              confidence: comparison.confidence,
+              decision: 'flagged_review',
+              status: 'pending',
+              ai_reasoning: comparison.reasoning,
+              gps_distance_m: Number(nearbyIncident.distance) || 0.0,
+              time_diff_h: timeDiff,
+              new_lat: Number(updatedReport.latitude),
+              new_lng: Number(updatedReport.longitude),
+            });
+
+            await updateIncidentStats(nearbyIncident.id);
+          } else {
+            // High confidence that it's NOT a duplicate -> Create new incident
+            logger.info('Comparison confidence low, creating new incident', { reportId: report_id });
+            const code = 'INC-' + Math.floor(1000 + Math.random() * 9000);
+            const newInc = await createIncident({
+              code,
+              status: 'open',
+              risk_level: updatedReport.risk_level as any || 'medium',
+              latitude: Number(updatedReport.latitude),
+              longitude: Number(updatedReport.longitude),
+              zone_id: updatedReport.zone_id || undefined,
+              zone_name: updatedReport.location_name || undefined,
+              primary_report_id: report_id,
+              site_type: updatedReport.site_type as any || 'other',
+            });
+            await updateReportIncident(report_id, newInc.id);
+            incidentId = newInc.id;
+
+            await createDecision({
+              new_report_id: report_id,
+              matched_incident_id: nearbyIncident.id,
+              confidence: comparison.confidence,
+              decision: 'new_incident',
+              status: 'approved',
+              ai_reasoning: comparison.reasoning,
+              gps_distance_m: Number(nearbyIncident.distance) || 0.0,
+              time_diff_h: timeDiff,
+              new_lat: Number(updatedReport.latitude),
+              new_lng: Number(updatedReport.longitude),
+            });
+
+            await updateIncidentStats(newInc.id);
+          }
+        }
+      } else {
+        // No nearby open incidents -> Create new incident
+        logger.info('No nearby incidents found, creating new incident', { reportId: report_id });
+        const code = 'INC-' + Math.floor(1000 + Math.random() * 9000);
+        const newInc = await createIncident({
+          code,
+          status: 'open',
+          risk_level: updatedReport.risk_level as any || 'medium',
+          latitude: Number(updatedReport.latitude),
+          longitude: Number(updatedReport.longitude),
+          zone_id: updatedReport.zone_id || undefined,
+          zone_name: updatedReport.location_name || undefined,
+          primary_report_id: report_id,
+          site_type: updatedReport.site_type as any || 'other',
+        });
+        await updateReportIncident(report_id, newInc.id);
+        incidentId = newInc.id;
+
+        await createDecision({
+          new_report_id: report_id,
+          matched_incident_id: undefined,
+          confidence: 1.0,
+          decision: 'new_incident',
+          status: 'approved',
+          ai_reasoning: 'No nearby open incidents found within 50m.',
+          gps_distance_m: 0.0,
+          time_diff_h: 0.0,
+          new_lat: Number(updatedReport.latitude),
+          new_lng: Number(updatedReport.longitude),
+        });
+
+        await updateIncidentStats(newInc.id);
+      }
+    }
+
+
     // ── 8. Auto-create work order for high/critical reports ────────────────
     let workOrderId: string | null = null;
     const isHighRisk =
       analysis.risk_level === RISK_LEVELS.HIGH ||
       analysis.risk_level === RISK_LEVELS.CRITICAL;
-    const aboveConfidenceGate = !analysis.needs_human_review;
+    const aboveConfidenceGate = finalStatus !== 'needs_human_review';
 
     if (isHighRisk && aboveConfidenceGate) {
       const priorityScore = computePriorityScore(analysis.risk_level, analysis.confidence_score);
@@ -183,6 +343,10 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
       status: finalStatus,
     });
 
+    if (incidentId) {
+      getIO().emit('incident:updated', { incident_id: incidentId });
+    }
+
     if (workOrderId) {
       emitWorkOrderCreated({
         workorder_id: workOrderId,
@@ -191,6 +355,7 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
         priority_score: computePriorityScore(analysis.risk_level, analysis.confidence_score),
       });
     }
+
 
   } catch (err) {
     // On unrecoverable error, mark report as failed

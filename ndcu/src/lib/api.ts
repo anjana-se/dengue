@@ -1,4 +1,4 @@
-import type { Report, WorkOrder, Zone, SourceType, ReportStatus, WorkOrderStatus, StaffUser, CurrentUser } from '../types';
+import type { Report, WorkOrder, Zone, SourceType, ReportStatus, WorkOrderStatus, StaffUser, CurrentUser, DengueCase, Trap, Incident, IncidentDetail, Decision } from '../types';
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:3000/api/v1';
 
@@ -310,4 +310,92 @@ export const api = {
     });
     return res.data.user;
   },
+
+  // ── Cases ──────────────────────────────────────────────────────────────
+  async getCases(filters?: { zone_id?: string; severity?: string }): Promise<DengueCase[]> {
+    const params = new URLSearchParams();
+    if (filters?.zone_id) params.set('zone_id', filters.zone_id);
+    if (filters?.severity) params.set('severity', filters.severity);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await this.request(`/cases${qs}`);
+    return res.data || [];
+  },
+
+  // ── IoT Traps ─────────────────────────────────────────────────────────
+  async getTraps(zoneId?: string): Promise<Trap[]> {
+    const qs = zoneId ? `?zone_id=${zoneId}` : '';
+    const res = await this.request(`/traps${qs}`);
+    return res.data || [];
+  },
+
+  // ── Incidents ─────────────────────────────────────────────────────────
+  async getIncidents(): Promise<Incident[]> {
+    const res = await this.request('/incidents');
+    const raw = res.data || [];
+    return raw.map((i: any) => ({
+      incident_id: i.id,
+      code: i.code,
+      status: i.status,
+      risk_level: i.risk_level,
+      lat: i.latitude,
+      lng: i.longitude,
+      zone_id: i.zone_id,
+      zone_name: i.zone_name,
+      confirmation_count: i.confirmation_count,
+      report_count: i.report_count,
+      primary_report_id: i.primary_report_id,
+      created_at: i.created_at,
+      verified_at: i.verified_at,
+      resolved_at: i.resolved_at,
+      site_type: i.site_type,
+    }));
+  },
+
+  async getIncidentDetail(id: string): Promise<IncidentDetail> {
+    const res = await this.request(`/incidents/${id}`);
+    return res.data;
+  },
+
+  async getDuplicateDecisions(): Promise<Decision[]> {
+    const res = await this.request('/incidents/decisions');
+    const raw = res.data || [];
+    return raw.map((d: any) => ({
+      decision_id: d.id,
+      new_report_id: d.new_report_id,
+      matched_incident_id: d.matched_incident_id,
+      confidence: d.confidence,
+      decision: d.decision,
+      status: d.status,
+      ai_reasoning: d.ai_reasoning,
+      reviewed_by: d.reviewed_by,
+      override_reason: d.override_reason,
+      created_at: d.created_at,
+      reviewed_at: d.reviewed_at,
+      gps_distance_m: d.gps_distance_m,
+      time_diff_h: d.time_diff_h,
+      new_lat: d.new_lat,
+      new_lng: d.new_lng,
+    }));
+  },
+
+  async resolveDuplicateDecision(
+    decisionId: string,
+    action: 'merge' | 'separate' | 'new_incident',
+    notes?: string
+  ): Promise<any> {
+    const res = await this.request(`/incidents/decisions/${decisionId}/resolve`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action, notes }),
+    });
+    return res.data;
+  },
+
+  async updateIncidentStatus(id: string, status: string): Promise<any> {
+    const res = await this.request(`/incidents/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+    return res.data;
+  },
 };
+
