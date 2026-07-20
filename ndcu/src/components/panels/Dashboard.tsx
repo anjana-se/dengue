@@ -33,14 +33,15 @@ export default function Dashboard() {
   const today = new Date().toDateString();
   const incToday = incidents.filter((i) => new Date(i.created_at).toDateString() === today).length;
   const pend = pendingDecisions(decisions).length;
-  const highRiskZones = zones.filter((z) => z.risk_level === 'high' || z.risk_level === 'critical').length;
-  const criticalZones = zones.filter((z) => z.risk_level === 'critical').length;
+  const activeRiskZones = zones.filter((z) => z.risk_score > 0 || z.active_report_count > 0);
+  const highRiskZones = activeRiskZones.filter((z) => z.risk_level === 'high' || z.risk_level === 'critical').length;
+  const criticalZones = activeRiskZones.filter((z) => z.risk_level === 'critical').length;
   const openOrders = dashboardSummary?.workorders
     ? dashboardSummary.workorders.open + dashboardSummary.workorders.accepted
     : orders.filter((o) => o.status !== 'resolved').length;
   const unassignedOrders = orders.filter((o) => o.status === 'new').length;
-  const avgRiskScore = zones.length
-    ? Math.round(zones.reduce((s, z) => s + z.risk_score, 0) / zones.length)
+  const avgRiskScore = activeRiskZones.length
+    ? Math.round(activeRiskZones.reduce((s, z) => s + z.risk_score, 0) / activeRiskZones.length)
     : 0;
 
   const at = traps.filter((t) => t.status === 'active');
@@ -48,7 +49,7 @@ export default function Dashboard() {
   const base = Math.round(traps.reduce((a, t) => a + t.readings.mosquito_count_7d / 7, 0));
 
   const kpis: Kpi[] = [
-    ['Incidents today', String(incToday || 3), '+2 vs yesterday', PRIMARY],
+    ['Incidents today', String(incToday), incToday > 0 ? 'Live tracking' : 'No incidents today', PRIMARY],
     ['High-risk zones', String(highRiskZones), criticalZones > 0 ? criticalZones + ' critical 🚨' : 'No critical zones', criticalZones > 0 ? '#DC2626' : AMBER],
     ['Open work orders', String(openOrders), unassignedOrders > 0 ? unassignedOrders + ' unassigned' : 'all assigned', '#3B82F6'],
     ['Avg risk score', String(avgRiskScore) + ' / 100', avgRiskScore >= 70 ? 'High risk · ▲' : avgRiskScore >= 50 ? 'Elevated ·▲' : 'Normal', avgRiskScore >= 70 ? '#DC2626' : avgRiskScore >= 50 ? AMBER : '#10B981'],

@@ -8,14 +8,16 @@ export default function ZoneRiskTable() {
   const zones = useStore((s) => s.zones);
   const selectZone = useStore((s) => s.selectZone);
 
-  const sorted = [...zones].sort((a, b) => b.risk_score - a.risk_score);
+  const sorted = zones
+    .filter((z) => z.risk_score > 0 || z.active_report_count > 0)
+    .sort((a, b) => b.risk_score - a.risk_score);
 
   if (sorted.length === 0) {
     return (
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8e5', padding: '20px 16px' }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Zone Risk Ranking</div>
         <div style={{ fontSize: 13, color: '#94a29d', textAlign: 'center', padding: '12px 0' }}>
-          Loading zone data…
+          No active risk zones detected. All monitored zones are clear.
         </div>
       </div>
     );

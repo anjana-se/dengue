@@ -100,9 +100,9 @@ async function fetchBoundaryGeometry(lat: number, lng: number, layerId: number):
         const coords = geometry.rings.map((ring: [number, number][]) =>
           ring.map((pt: [number, number]) => [pt[1], pt[0]] as [number, number])
         );
-        const name = attrs.gnd_name || attrs.ds_division_name || attrs.district_name || attrs.province_name || feature.value || 'Unknown';
-        const district = attrs.district_name || attrs.District_Name;
-        const province = attrs.province_name || attrs.Province_Name;
+        const name = attrs['GND Name'] || attrs.gnd_name || attrs.ds_division_name || attrs.district_name || attrs.province_name || feature.value || 'Unknown';
+        const district = attrs['District Name'] || attrs.district_name || attrs.District_Name;
+        const province = attrs['Province Name'] || attrs.province_name || attrs.Province_Name;
 
         return { coords, name, district, province };
       }
@@ -113,32 +113,31 @@ async function fetchBoundaryGeometry(lat: number, lng: number, layerId: number):
   return null;
 }
 
-// Get dynamic styling properties based on Zoom level and Case count
-function getZoneStyle(zoom: number, caseCount: number) {
-  // Safe-to-risk color scale (green to red):
-  // 0-2 cases: Safe/Low (Green)
-  // 3-5 cases: Medium (Yellow)
-  // 6-10 cases: High (Orange)
-  // > 10 cases: Critical (Red)
-  const fillCol = caseCount > 10 ? '#EF4444' : caseCount > 5 ? '#F97316' : caseCount > 2 ? '#EAB308' : '#10B981';
-  const borderCol = caseCount > 10 ? '#991B1B' : caseCount > 5 ? '#C2410C' : caseCount > 2 ? '#854D0E' : '#065F46';
+// Get dynamic styling properties based on Zoom level and Risk level/score
+function getZoneStyle(zoom: number, riskLevel: string, riskScore: number) {
+  const colorMap = {
+    critical: { color: '#991B1B', fillColor: '#EF4444' },
+    high:     { color: '#C2410C', fillColor: '#F97316' },
+    medium:   { color: '#854D0E', fillColor: '#EAB308' },
+    low:      { color: '#065F46', fillColor: '#10B981' },
+  };
+  const c = colorMap[riskLevel as keyof typeof colorMap] || (riskScore >= 40 ? colorMap.medium : colorMap.low);
 
-  // Adjust style properties (stroke weight, opacity) based on Zoom level
-  let weight = 1.5;
-  let fillOpacity = 0.10;
+  let weight = 2.0;
+  let fillOpacity = 0.25;
 
   if (zoom <= 10) {
-    weight = 2.5;
-    fillOpacity = 0.20;
+    weight = 3.0;
+    fillOpacity = 0.35;
   } else if (zoom <= 13) {
-    weight = 2.0;
-    fillOpacity = 0.15;
+    weight = 2.5;
+    fillOpacity = 0.30;
   }
 
   return {
-    color: borderCol,
+    color: c.color,
     weight,
-    fillColor: fillCol,
+    fillColor: c.fillColor,
     fillOpacity,
   };
 }
@@ -278,6 +277,18 @@ export default function MapView() {
       let isFallback = true;
       let cachedInfo: BoundaryInfo | null = null;
 
+      // If single-point fallback coordinate, expand into a 4-point bounding box polygon
+      if (coords.length === 1 || (coords.length > 0 && !Array.isArray(coords[0][0]))) {
+        const p = Array.isArray(coords[0]) && typeof coords[0][0] === 'number' ? (coords[0] as unknown as [number, number]) : [6.9271, 79.8612] as [number, number];
+        const lat = p[0], lng = p[1];
+        coords = [
+          [lat + 0.006, lng - 0.006],
+          [lat + 0.006, lng + 0.006],
+          [lat - 0.006, lng + 0.006],
+          [lat - 0.006, lng - 0.006],
+        ];
+      }
+
       // Select active layer ID based on current zoom level
       const activeLayerId = zoom <= 10 ? 4 : zoom <= 13 ? 3 : 1;
       const cached = boundaryCache[z.zone_id]?.[activeLayerId];
@@ -296,14 +307,13 @@ export default function MapView() {
         return isPointInPolygon([c.lat, c.lng], z.c);
       }).length;
 
-      const style = getZoneStyle(zoom, caseCount);
+      const style = getZoneStyle(zoom, z.risk_level, z.risk_score);
 
-      // If fallback rectangular box, make it fully transparent (removing boxes from map)
       const poly = L.polygon(coords as any, {
-        color: isFallback ? 'transparent' : style.color,
-        weight: isFallback ? 0 : style.weight,
-        fillColor: isFallback ? 'transparent' : style.fillColor,
-        fillOpacity: isFallback ? 0 : style.fillOpacity,
+        color: style.color,
+        weight: style.weight,
+        fillColor: style.fillColor,
+        fillOpacity: z.risk_score > 0 || z.active_report_count > 0 ? style.fillOpacity : 0.1,
       }).addTo(g);
 
       poly.on('click', () => {
@@ -316,7 +326,10 @@ export default function MapView() {
           c: cachedInfo?.coords ? (cachedInfo.coords[0] as any) : z.c,
         });
       });
-      poly.bindTooltip((cachedInfo?.name || z.name) + ' · ' + caseCount + ' cases', { sticky: true, direction: 'top' });
+      poly.bindTooltip(
+        `${cachedInfo?.name || z.name} · Risk: ${(z.risk_level || 'low').toUpperCase()} (${z.risk_score}/100) · ${z.active_report_count} active reports`,
+        { sticky: true, direction: 'top' }
+      );
     });
   }, [ready, layers.zones, zones, cases, zoom, boundaryCache, selectZone]);
 
@@ -365,9 +378,23 @@ export default function MapView() {
       const icon = L.divIcon({ className: '', html, iconSize: [16, 16], iconAnchor: [8, 8] });
       L.marker([inc.lat, inc.lng], { icon }).addTo(g).on('click', () => selectIncident(inc));
     });
+
+    // Auto-fit map view bounds to reported incidents/reports if available
+    const map = mapRef.current;
+    if (map) {
+      const activePts: [number, number][] = [];
+      incidents.forEach((i) => activePts.push([i.lat, i.lng]));
+      reports.forEach((r) => { if (r.lat != null && r.lng != null) activePts.push([r.lat, r.lng]); });
+      if (activePts.length > 0) {
+        try {
+          const bounds = L.latLngBounds(activePts);
+          map.fitBounds(bounds, { maxZoom: 14, padding: [50, 50] });
+        } catch {}
+      }
+    }
   }, [ready, layers.community, view, incidents, reports, orders, selectIncident, setActiveOrder, setActiveReport]);
 
-  // ---- outbreak-forecast bands (with pulse animation for emergency zones) ----
+  // ---- outbreak-forecast bands (dynamic per zone risk level) ----
   useEffect(() => {
     const g = predLayerRef.current;
     if (!ready || !g) return;
@@ -378,23 +405,25 @@ export default function MapView() {
     }
     if (!layers.forecast) return;
     const pulsers: Polygon[] = [];
-    PREDICTIONS.forEach((p) => {
-      const band = PRED_BAND(p.outbreak_probability);
-      if (!band) return;
-      const poly = L.polygon(p.c, {
-        color: band.fill,
-        weight: band.pulse ? 2.5 : 1.5,
-        fillColor: band.fill,
-        fillOpacity: band.op,
-        dashArray: band.pulse ? '6 4' : undefined,
+
+    // Filter active risk zones
+    const activeRiskZones = zones.filter((z) => z.risk_score >= 40 || z.risk_level === 'high' || z.risk_level === 'critical');
+    activeRiskZones.forEach((z) => {
+      const isCritical = z.risk_level === 'critical' || z.risk_score >= 80;
+      const poly = L.polygon(z.c as any, {
+        color: isCritical ? '#DC2626' : '#F59E0B',
+        weight: isCritical ? 2.5 : 1.5,
+        fillColor: isCritical ? '#DC2626' : '#F59E0B',
+        fillOpacity: 0.3,
+        dashArray: isCritical ? '6 4' : undefined,
       }).addTo(g);
-      poly.on('click', () => selectPrediction(p));
-      poly.bindTooltip(p.zone_name + ' · ' + Math.round(p.outbreak_probability * 100) + '%', {
+      poly.bindTooltip(z.name + ' · Outbreak Risk: ' + (z.risk_level || 'high').toUpperCase() + ' (' + z.risk_score + '/100)', {
         sticky: true,
         direction: 'top',
       });
-      if (band.pulse) pulsers.push(poly);
+      if (isCritical) pulsers.push(poly);
     });
+
     if (pulsers.length) {
       let on = false;
       pulseTimerRef.current = window.setInterval(() => {
@@ -408,7 +437,7 @@ export default function MapView() {
         pulseTimerRef.current = null;
       }
     };
-  }, [ready, layers.forecast, selectPrediction]);
+  }, [ready, layers.forecast, zones]);
 
   // ---- IoT traps (hex markers / heatmap) ----
   useEffect(() => {

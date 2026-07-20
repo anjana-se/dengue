@@ -7,17 +7,8 @@ interface TokenPair {
   refresh_token: string;
 }
 
-// Polygon coordinates for each seeded zone (matched to backend UUIDs)
-const ZONE_COORDS: Record<string, [number, number][]> = {
-  '00000000-0000-0000-0000-000000000001': [[6.940, 79.842], [6.940, 79.856], [6.930, 79.856], [6.930, 79.842]],
-  '00000000-0000-0000-0000-000000000002': [[6.940, 79.856], [6.940, 79.870], [6.930, 79.870], [6.930, 79.856]],
-  '00000000-0000-0000-0000-000000000003': [[6.930, 79.856], [6.930, 79.872], [6.920, 79.872], [6.920, 79.856]],
-  '00000000-0000-0000-0000-000000000004': [[6.930, 79.842], [6.930, 79.856], [6.920, 79.856], [6.920, 79.842]],
-  '00000000-0000-0000-0000-000000000005': [[6.920, 79.840], [6.920, 79.856], [6.908, 79.856], [6.908, 79.840]],
-  '00000000-0000-0000-0000-000000000006': [[6.920, 79.870], [6.920, 79.886], [6.908, 79.886], [6.908, 79.870]],
-  '00000000-0000-0000-0000-000000000007': [[6.908, 79.848], [6.908, 79.864], [6.895, 79.864], [6.895, 79.848]],
-  '00000000-0000-0000-0000-000000000008': [[6.895, 79.850], [6.895, 79.866], [6.882, 79.866], [6.882, 79.850]],
-};
+// Legacy hardcoded zone coords removed — zones are now dynamic with real NSDI geometry
+const ZONE_COORDS: Record<string, [number, number][]> = {};
 
 const getLocal = (key: string): string | null => {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -125,18 +116,56 @@ export const api = {
   },
 
   // ── Zones ──────────────────────────────────────────────────────────────
-  async getZones(): Promise<Zone[]> {
-    const res = await this.request('/zones');
+  async getZones(activeOnly = false): Promise<Zone[]> {
+    const qs = activeOnly ? '?active_only=true' : '';
+    const res = await this.request(`/zones${qs}`);
     const raw = res.data || [];
-    return raw.map((z: any) => ({
-      zone_id: z.id,
-      name: z.name,
-      risk_score: z.risk_score,
-      risk_level: z.risk_level,
-      active_report_count: z.active_report_count,
-      open_orders: 0,
-      c: ZONE_COORDS[z.id] || [[6.9271, 79.8612]],
-    }));
+    return raw.map((z: any) => {
+      let coords: [number, number][] = [];
+
+      // 1. Parse real GeoJSON geometry from PostGIS backend
+      if (z.geom_json) {
+        try {
+          const parsed = JSON.parse(z.geom_json);
+          if (parsed.type === 'MultiPolygon' && parsed.coordinates?.[0]?.[0]) {
+            coords = parsed.coordinates[0][0].map((pt: [number, number]) => [Number(pt[1]), Number(pt[0])]);
+          } else if (parsed.type === 'Polygon' && parsed.coordinates?.[0]) {
+            coords = parsed.coordinates[0].map((pt: [number, number]) => [Number(pt[1]), Number(pt[0])]);
+          }
+        } catch (e) {
+          console.warn('Failed to parse zone geom_json', e);
+        }
+      }
+
+      // 2. Fall back to centroid lat/lng
+      if ((!coords || coords.length === 0) && z.lat != null && z.lng != null) {
+        const lat = Number(z.lat);
+        const lng = Number(z.lng);
+        coords = [
+          [lat + 0.005, lng - 0.005],
+          [lat + 0.005, lng + 0.005],
+          [lat - 0.005, lng + 0.005],
+          [lat - 0.005, lng - 0.005],
+        ];
+      }
+
+      // 3. Fall back to hardcoded map or Colombo default
+      if (!coords || coords.length === 0) {
+        coords = ZONE_COORDS[z.id] || [[6.9271, 79.8612]];
+      }
+
+      return {
+        zone_id: z.id,
+        name: z.name,
+        district: z.district,
+        province: z.province,
+        risk_score: Number(z.risk_score || 0),
+        risk_level: z.risk_level || 'low',
+        active_report_count: Number(z.active_report_count || 0),
+        open_orders: 0,
+        c: coords,
+      };
+    });
   },
 
   // ── Reports ────────────────────────────────────────────────────────────

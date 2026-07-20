@@ -14,14 +14,14 @@ import type {
 export const CENTER: LatLng = [6.9271, 79.8612];
 
 export const ZONES: Zone[] = [
-  { zone_id: '00000000-0000-0000-0000-000000000001', name: 'Colombo Fort', risk_score: 88, risk_level: 'critical', active_report_count: 14, open_orders: 6, c: [[6.94, 79.842], [6.94, 79.856], [6.93, 79.856], [6.93, 79.842]] },
-  { zone_id: '00000000-0000-0000-0000-000000000002', name: 'Pettah', risk_score: 81, risk_level: 'critical', active_report_count: 11, open_orders: 5, c: [[6.94, 79.856], [6.94, 79.87], [6.93, 79.87], [6.93, 79.856]] },
-  { zone_id: '00000000-0000-0000-0000-000000000003', name: 'Maradana', risk_score: 67, risk_level: 'high', active_report_count: 8, open_orders: 3, c: [[6.93, 79.856], [6.93, 79.872], [6.92, 79.872], [6.92, 79.856]] },
-  { zone_id: '00000000-0000-0000-0000-000000000004', name: 'Slave Island', risk_score: 59, risk_level: 'high', active_report_count: 6, open_orders: 2, c: [[6.93, 79.842], [6.93, 79.856], [6.92, 79.856], [6.92, 79.842]] },
-  { zone_id: '00000000-0000-0000-0000-000000000005', name: 'Kollupitiya', risk_score: 44, risk_level: 'medium', active_report_count: 4, open_orders: 1, c: [[6.92, 79.84], [6.92, 79.856], [6.908, 79.856], [6.908, 79.84]] },
-  { zone_id: '00000000-0000-0000-0000-000000000006', name: 'Borella', risk_score: 38, risk_level: 'medium', active_report_count: 3, open_orders: 1, c: [[6.92, 79.87], [6.92, 79.886], [6.908, 79.886], [6.908, 79.87]] },
-  { zone_id: '00000000-0000-0000-0000-000000000007', name: 'Bambalapitiya', risk_score: 22, risk_level: 'low', active_report_count: 1, open_orders: 0, c: [[6.908, 79.848], [6.908, 79.864], [6.895, 79.864], [6.895, 79.848]] },
-  { zone_id: '00000000-0000-0000-0000-000000000008', name: 'Wellawatte', risk_score: 17, risk_level: 'low', active_report_count: 1, open_orders: 0, c: [[6.895, 79.85], [6.895, 79.866], [6.882, 79.866], [6.882, 79.85]] },
+  { zone_id: '00000000-0000-0000-0000-000000000001', name: 'Colombo Fort', risk_score: 0, risk_level: 'low', active_report_count: 0, open_orders: 0, c: [[6.94, 79.842], [6.94, 79.856], [6.93, 79.856], [6.93, 79.842]] },
+  { zone_id: '00000000-0000-0000-0000-000000000002', name: 'Pettah', risk_score: 0, risk_level: 'low', active_report_count: 0, open_orders: 0, c: [[6.94, 79.856], [6.94, 79.87], [6.93, 79.87], [6.93, 79.856]] },
+  { zone_id: '00000000-0000-0000-0000-000000000003', name: 'Maradana', risk_score: 0, risk_level: 'low', active_report_count: 0, open_orders: 0, c: [[6.93, 79.856], [6.93, 79.872], [6.92, 79.872], [6.92, 79.856]] },
+  { zone_id: '00000000-0000-0000-0000-000000000004', name: 'Slave Island', risk_score: 0, risk_level: 'low', active_report_count: 0, open_orders: 0, c: [[6.93, 79.842], [6.93, 79.856], [6.92, 79.856], [6.92, 79.842]] },
+  { zone_id: '00000000-0000-0000-0000-000000000005', name: 'Kollupitiya', risk_score: 0, risk_level: 'low', active_report_count: 0, open_orders: 0, c: [[6.92, 79.84], [6.92, 79.856], [6.908, 79.856], [6.908, 79.84]] },
+  { zone_id: '00000000-0000-0000-0000-000000000006', name: 'Borella', risk_score: 0, risk_level: 'low', active_report_count: 0, open_orders: 0, c: [[6.92, 79.87], [6.92, 79.886], [6.908, 79.886], [6.908, 79.87]] },
+  { zone_id: '00000000-0000-0000-0000-000000000007', name: 'Bambalapitiya', risk_score: 0, risk_level: 'low', active_report_count: 0, open_orders: 0, c: [[6.908, 79.848], [6.908, 79.864], [6.895, 79.864], [6.895, 79.848]] },
+  { zone_id: '00000000-0000-0000-0000-000000000008', name: 'Wellawatte', risk_score: 0, risk_level: 'low', active_report_count: 0, open_orders: 0, c: [[6.895, 79.85], [6.895, 79.866], [6.882, 79.866], [6.882, 79.85]] },
 ];
 
 export const SITES: string[] = [
