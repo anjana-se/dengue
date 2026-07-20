@@ -1,192 +1,156 @@
-import { ReactNode } from "react";
 import { useI18n } from "../i18n/LanguageProvider";
+import type { Report } from "../types";
 import { RiskBadge, StatusBadge } from "./Badges";
-import { SitePhotoArt } from "./icons";
-import { RISK } from "../theme";
-import { GUIDE } from "../lib/risk";
 import { timeAgo } from "../lib/mock";
-import type { StringKey } from "../i18n/strings";
-import type { Report, ReportStatus } from "../types";
 
-interface WorkOrder {
-  text: string;
-  bg: string;
-  color: string;
-  iconBg: string;
-  icon: ReactNode;
+interface DetailSheetProps {
+  report: Report | null;
+  onClose: () => void;
 }
 
-function workOrder(status: ReportStatus, T: (k: StringKey) => string): WorkOrder {
-  if (status === "flagged") {
-    return {
-      text: T("work_order_assigned"),
-      bg: "#EEF2FF",
-      color: "#4338CA",
-      iconBg: "#4338CA",
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="8" r="3" stroke="#fff" strokeWidth="1.8" />
-          <path d="M5 20a7 7 0 0 1 14 0" stroke="#fff" strokeWidth="1.8" />
-        </svg>
-      ),
-    };
-  }
-  if (status === "complete") {
-    return {
-      text: T("work_order_resolved"),
-      bg: "#ECFDF5",
-      color: "#059669",
-      iconBg: "#10B981",
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M5 12l4.5 4.5L19 7" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-    };
-  }
-  return {
-    text: T("work_order_review"),
-    bg: "#FEF3C7",
-    color: "#B45309",
-    iconBg: "#D97706",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="8" stroke="#fff" strokeWidth="1.8" />
-        <path d="M12 8v4l2.5 2" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  };
-}
+export function DetailSheet({ report, onClose }: DetailSheetProps) {
+  const { lang, t } = useI18n();
+  if (!report) return null;
 
-export function DetailSheet({ report, onClose }: { report: Report; onClose: () => void }) {
-  const { t, lang } = useI18n();
-  const wo = workOrder(report.status, t);
+  const guidance =
+    lang === "si" && report.guidanceTextSi
+      ? report.guidanceTextSi
+      : lang === "ta" && report.guidanceTextTa
+        ? report.guidanceTextTa
+        : report.guidanceText;
 
   return (
     <div
       onClick={onClose}
       style={{
-        position: "fixed",
+        position: "absolute",
         inset: 0,
-        background: "rgba(11,15,13,.42)",
-        zIndex: 100,
+        background: "rgba(11,15,13,.45)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        zIndex: 50,
         display: "flex",
-        justifyContent: "center",
         alignItems: "flex-end",
-        animation: "dgfade .25s ease",
+        animation: "dgfade .2s ease",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={report.zone}
         style={{
           width: "100%",
-          maxWidth: 480,
-          maxHeight: "88%",
+          maxHeight: "85%",
           background: "#FAFAF8",
-          borderRadius: "22px 22px 0 0",
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          padding: "20px 20px calc(24px + env(safe-area-inset-bottom))",
+          boxShadow: "0 -10px 40px rgba(0,0,0,.2)",
           overflowY: "auto",
-          animation: "dgsheet .32s cubic-bezier(.2,.8,.2,1)",
+          animation: "dgslideup .25s cubic-bezier(0.16,1,0.3,1)",
         }}
       >
-        <div style={{ position: "sticky", top: 0, background: "#FAFAF8", padding: "12px 0 4px", display: "flex", justifyContent: "center", zIndex: 2 }}>
-          <span style={{ width: 42, height: 5, borderRadius: 3, background: "#d5ddd7" }} />
+        <div
+          style={{
+            width: 36,
+            height: 4,
+            borderRadius: 2,
+            background: "#cbd6cf",
+            margin: "0 auto 16px",
+          }}
+        />
+
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 13, color: "#8a978f", fontWeight: 500 }}>{timeAgo(report)}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#1c2b26", marginTop: 2 }}>{report.zone}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              border: "none",
+              background: "#eef2ef",
+              color: "#4b5a54",
+              fontSize: 18,
+              lineHeight: 1,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ×
+          </button>
         </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <RiskBadge risk={report.risk} />
+          <StatusBadge status={report.status} />
+        </div>
+
+        {report.imageUrl && (
+          <div style={{ marginTop: 14, borderRadius: 12, overflow: "hidden", height: 160, background: "#12343a" }}>
+            <img src={report.imageUrl} alt={report.siteType} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+        )}
 
         <div
           style={{
-            height: 200,
-            background: RISK[report.risk].thumb,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 16px",
+            marginTop: 18,
+            padding: 16,
             borderRadius: 16,
-            position: "relative",
-            overflow: "hidden",
+            background: "#fff",
+            border: "1px solid rgba(13,74,62,.08)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
           }}
         >
-          {report.imageUrl ? (
-            <img
-              src={report.imageUrl}
-              alt={report.zone}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            <SitePhotoArt style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }} />
-          )}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#6b7a74" }}>{t("site_type_label")}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#1c2b26" }}>{report.siteType}</span>
+          </div>
+          <div style={{ height: 1, background: "#f0f4f1" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#6b7a74" }}>{t("confidence_label")}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#1c2b26" }}>{report.confidence}%</span>
+          </div>
         </div>
 
-        <div style={{ padding: "18px 20px 30px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 14 }}>
-            <RiskBadge risk={report.risk} size="md" />
-            <StatusBadge status={report.status} size="md" />
-          </div>
-          <h2 style={{ margin: "0 0 3px", fontSize: 19, fontWeight: 700, color: "#0D4A3E" }}>{report.zone}</h2>
-          {report.latitude != null && report.longitude != null && (
-            <div style={{ fontSize: 12, color: "#8a978f", marginBottom: 6 }}>
-              {report.latitude.toFixed(6)}, {report.longitude.toFixed(6)}
-            </div>
-          )}
-          <div style={{ fontSize: 13, color: "#8a978f", marginBottom: 18 }}>{timeAgo(report)}</div>
-
-          <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
-            <div style={{ flex: 1, padding: 12, background: "#fff", border: "1px solid rgba(13,74,62,.08)", borderRadius: 12 }}>
-              <div style={{ fontSize: 12, color: "#8a978f", marginBottom: 3 }}>{t("site_type_label")}</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1c2b26" }}>{report.siteType}</div>
-            </div>
-            <div style={{ flex: 1, padding: 12, background: "#fff", border: "1px solid rgba(13,74,62,.08)", borderRadius: 12 }}>
-              <div style={{ fontSize: 12, color: "#8a978f", marginBottom: 3 }}>{t("confidence_label")}</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1c2b26" }}>{report.confidence}%</div>
-            </div>
-          </div>
-
+        {guidance && (
           <div
             style={{
-              padding: "14px 14px 14px 16px",
-              background: "#F0F6F2",
-              borderLeft: "4px solid #0D4A3E",
-              borderRadius: "0 12px 12px 0",
-              marginBottom: 18,
+              marginTop: 14,
+              padding: 14,
+              borderRadius: 14,
+              background: "#E8F3EC",
+              border: "1px solid rgba(13,74,62,.15)",
             }}
           >
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: ".4px",
-                color: "#0D4A3E",
-                marginBottom: 6,
-              }}
-            >
-              {t("guidance_label")}
-            </div>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#33433c" }}>
-              {(lang === "si" ? report.guidanceTextSi : lang === "ta" ? report.guidanceTextTa : report.guidanceText) || report.guidanceText || GUIDE[report.risk]}
-            </p>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#0D4A3E", marginBottom: 4 }}>{t("guidance_label")}</div>
+            <p style={{ margin: 0, fontSize: 13.5, color: "#1c2b26", lineHeight: 1.45 }}>{guidance}</p>
           </div>
+        )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 11, padding: 14, background: wo.bg, borderRadius: 13 }}>
-            <span
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                background: wo.iconBg,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flex: "none",
-              }}
-            >
-              {wo.icon}
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: wo.color, lineHeight: 1.35 }}>{wo.text}</span>
+        {report.status === "flagged" && (
+          <div
+            style={{
+              marginTop: 14,
+              padding: 14,
+              borderRadius: 14,
+              background: "#FEF2F2",
+              border: "1px solid #FECACA",
+              fontSize: 13.5,
+              color: "#991B1B",
+              fontWeight: 500,
+              lineHeight: 1.45,
+            }}
+          >
+            {t("work_order_assigned")}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

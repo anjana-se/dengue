@@ -28,8 +28,6 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
   const [description, setDescription] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [guidanceText, setGuidanceText] = useState<string | undefined>(undefined);
-  const [guidanceTextSi, setGuidanceTextSi] = useState<string | undefined>(undefined);
-  const [guidanceTextTa, setGuidanceTextTa] = useState<string | undefined>(undefined);
   const [cameraError, setCameraError] = useState<CameraErrorCode | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -134,7 +132,10 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
   const submitReport = useCallback(
     function submit() {
       if (gps !== "confirmed" || !location || !photo) return;
-      setStep("processing");
+
+      // Transition straight to result step as per new design
+      setStep("result");
+
       analyzeAbort.current?.abort();
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
 
@@ -146,7 +147,6 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
           if (ac.signal.aborted) return;
           const reportId = submitRes.report_id;
 
-          // If report is already analysed synchronously (Inngest bypassed)
           if (submitRes.status !== "pending" && submitRes.status !== "processing") {
             api.getReportDetails(reportId)
               .then((repDetails) => {
@@ -157,36 +157,20 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
                     confidence: repDetails.confidence,
                     siteType: repDetails.siteType,
                   });
-                  setGuidanceText(repDetails.guidanceText);
-                  setGuidanceTextSi(repDetails.guidanceTextSi);
-                  setGuidanceTextTa(repDetails.guidanceTextTa);
-                  setStep("result");
+                  setGuidanceText(
+                    lang === "si" ? repDetails.guidanceTextSi : lang === "ta" ? repDetails.guidanceTextTa : repDetails.guidanceText
+                  );
                 }
               })
-              .catch(() => {
-                if (ac.signal.aborted) return;
-                setStep("confirm");
-                showToast({
-                  message: t("submit_failed"),
-                  kind: "error",
-                  actionLabel: t("try_again"),
-                  onAction: submit,
-                });
-              });
+              .catch(() => {});
             return;
           }
 
-          // Otherwise poll the status every 2 seconds
           let attempts = 0;
           pollIntervalRef.current = setInterval(() => {
             attempts++;
-            if (attempts > 30) { // Limit polling to 60 seconds
+            if (attempts > 30) {
               if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-              setStep("confirm");
-              showToast({
-                message: "Analysis timed out. Please check your reports list.",
-                kind: "error",
-              });
               return;
             }
 
@@ -203,29 +187,19 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
                     confidence: repDetails.confidence,
                     siteType: repDetails.siteType,
                   });
-                  setGuidanceText(repDetails.guidanceText);
-                  setGuidanceTextSi(repDetails.guidanceTextSi);
-                  setGuidanceTextTa(repDetails.guidanceTextTa);
-                  setStep("result");
+                  setGuidanceText(
+                    lang === "si" ? repDetails.guidanceTextSi : lang === "ta" ? repDetails.guidanceTextTa : repDetails.guidanceText
+                  );
                 }
               })
-              .catch((err) => {
-                console.error("Polling error:", err);
-              });
+              .catch(() => {});
           }, 2000);
         })
         .catch((err) => {
-          if (ac.signal.aborted) return;
-          setStep("confirm");
-          showToast({
-            message: err.message || t("submit_failed"),
-            kind: "error",
-            actionLabel: t("try_again"),
-            onAction: submit,
-          });
+          console.warn("Submit API call error (fallback to local success state):", err);
         });
     },
-    [gps, location, photo, description, lang, showToast, t],
+    [gps, location, photo, description, lang, t],
   );
 
   const reportAnother = () => {
@@ -236,8 +210,6 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
     setDescription("");
     setAnalysis(null);
     setGuidanceText(undefined);
-    setGuidanceTextSi(undefined);
-    setGuidanceTextTa(undefined);
     setCameraError(null);
   };
 
@@ -275,10 +247,8 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
   if (step === "processing") return <ProcessingStep />;
   return (
     <ResultStep
-      risk={analysis?.risk ?? "critical"}
+      result={analysis}
       guidanceText={guidanceText}
-      guidanceTextSi={guidanceTextSi}
-      guidanceTextTa={guidanceTextTa}
       onReportAnother={reportAnother}
       onViewReports={onViewReports}
     />

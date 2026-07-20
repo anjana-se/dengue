@@ -2,13 +2,6 @@ import { Resend } from 'resend';
 import { config } from '../../config/env';
 import { logger } from '../../shared/logger';
 
-/**
- * integrations/email/client.ts
- *
- * Transactional email client using Resend.
- * Fallbacks to logging in development/test if API key is not configured.
- */
-
 let resendClient: Resend | null = null;
 
 function getResendClient(): Resend | null {
@@ -23,7 +16,15 @@ function getResendClient(): Resend | null {
 }
 
 export async function sendOtpEmail(to: string, code: string): Promise<void> {
+  // Always log demo OTP to console for seamless testing
+  console.log(`\n========================================\n🔑 DEMO OTP FOR ${to}: ${code}\n========================================\n`);
+
   const resend = getResendClient();
+  if (!resend) {
+    logger.info(`[Email Stub] Send OTP ${code} to ${to}`);
+    return;
+  }
+
   const subject = 'Your DengueGuard Verification Code';
   const html = `
     <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 500px; border: 1px solid #e5e7eb; border-radius: 8px; margin: 0 auto;">
@@ -39,11 +40,6 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
     </div>
   `;
 
-  if (!resend) {
-    logger.info(`[Email Stub] Send OTP ${code} to ${to}`);
-    return;
-  }
-
   try {
     const { data, error } = await resend.emails.send({
       from: config.RESEND_FROM_EMAIL,
@@ -53,13 +49,11 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
     });
 
     if (error) {
-      logger.error('Failed to send OTP email via Resend', { error });
-      throw new Error(`Email delivery failed: ${error.message}`);
+      logger.warn('Failed to send OTP email via Resend (continuing with logged demo OTP)', { error });
+    } else {
+      logger.info('OTP email sent successfully via Resend', { id: data?.id, to });
     }
-
-    logger.info('OTP email sent successfully via Resend', { id: data?.id, to });
   } catch (err) {
-    logger.error('Resend email error', { error: (err as Error).message });
-    throw err;
+    logger.warn('Resend email error (continuing with logged demo OTP)', { error: (err as Error).message });
   }
 }

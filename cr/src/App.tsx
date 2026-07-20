@@ -24,6 +24,13 @@ export function App() {
   const [detailReport, setDetailReport] = useState<Report | null>(null);
   const { toast, showToast } = useToastController();
 
+  const handleShowToastString = useCallback(
+    (msg: string) => {
+      showToast({ message: msg, kind: "info" });
+    },
+    [showToast]
+  );
+
   const onCaptureStep = useCallback((step: CaptureStep) => setCaptureStep(step), []);
 
   const changeTab = useCallback((next: AppTab) => {
@@ -38,7 +45,7 @@ export function App() {
     setTab("report");
     setCaptureStep("permission");
   }, []);
-  
+
   const handleLogout = useCallback(() => {
     api.logout();
     setRoute("welcome");
@@ -49,7 +56,7 @@ export function App() {
   const isApp = route === "app";
   const isReport = isApp && tab === "report";
   const showHeader = isApp && !(isReport && captureStep === "camera");
-  const showNav = isApp && !(isReport && (captureStep === "camera" || captureStep === "processing"));
+  const showNav = isApp && !(isReport && captureStep === "camera");
 
   // Dynamically load detailed report when detailId changes
   useEffect(() => {
@@ -102,7 +109,7 @@ export function App() {
 
         <main style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           {route === "welcome" && <WelcomeScreen onGetStarted={goLogin} />}
-          {route === "login" && <LoginScreen onLogin={goApp} />}
+          {route === "login" && <LoginScreen onSuccess={goApp} showToast={handleShowToastString} />}
           {isApp && tab === "report" && (
             <CaptureScreen onStepChange={onCaptureStep} showToast={showToast} onViewReports={viewReports} />
           )}

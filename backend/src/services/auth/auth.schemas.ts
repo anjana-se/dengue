@@ -8,14 +8,14 @@ import { z } from 'zod';
 // ─── OTP flow (community reporters) ─────────────────────────────────────────
 
 export const requestOtpSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().min(3, 'Email or phone number is required'),
   full_name: z.string().min(2).max(100).optional(),
 });
 
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
 
 export const verifyOtpSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().min(3, 'Email or phone number is required'),
   code: z
     .string()
     .length(6, 'OTP must be exactly 6 digits')

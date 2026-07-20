@@ -18,7 +18,7 @@ function pillStyle(active: boolean, lg: boolean): CSSProperties {
 }
 
 /** Language switcher. `sm` is the pill group in the header; `lg` is the welcome variant. */
-export function LangPills({ variant }: { variant: "sm" | "lg" }) {
+export function LangPills({ variant = "sm" }: { variant?: "sm" | "lg" }) {
   const { lang, setLang } = useI18n();
   const lg = variant === "lg";
 

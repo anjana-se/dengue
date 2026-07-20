@@ -36,6 +36,37 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
+export function DengueGuardMark({ style }: { style?: CSSProperties }) {
+  return (
+    <div
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 9,
+        background: "#0D4A3E",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flex: "none",
+        ...style,
+      }}
+    >
+      <DropGlyph size={18} />
+    </div>
+  );
+}
+
+export function DengueGuardLogo({ style }: { style?: CSSProperties }) {
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 9, ...style }}>
+      <DengueGuardMark style={{ width: 34, height: 34 }} />
+      <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: "-.02em", color: "#0D4A3E" }}>
+        DengueGuard
+      </span>
+    </div>
+  );
+}
+
 /** Large gradient drop used on the welcome hero. */
 export function WelcomeGlyph() {
   return (

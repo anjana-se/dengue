@@ -18,17 +18,17 @@ export function ctaStyle(enabled: boolean, bg: string = color.forest): CSSProper
 }
 
 /** Tall primary button used on welcome / result screens. */
-export function heroButtonStyle(bg: string, shadow: string): CSSProperties {
+export function heroButtonStyle(bg: string, shadow: string, disabled: boolean = false): CSSProperties {
   return {
     width: "100%",
     height: 54,
     border: "none",
     borderRadius: 14,
-    background: bg,
+    background: disabled ? "#c7cfc9" : bg,
     color: "#fff",
     fontSize: 17,
     fontWeight: 600,
-    cursor: "pointer",
-    boxShadow: shadow,
+    cursor: disabled ? "not-allowed" : "pointer",
+    boxShadow: disabled ? "none" : shadow,
   };
 }
