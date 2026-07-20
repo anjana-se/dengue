@@ -52,6 +52,7 @@ function computePriorityScore(
     high: 50,
     medium: 20,
     low: 5,
+    none: 0,
   };
   const base = riskWeight[riskLevel] ?? 10;
   // Confidence scales the score: 0.70 confidence → 70% of base weight

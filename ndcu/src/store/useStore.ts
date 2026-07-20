@@ -6,7 +6,6 @@ import type {
   Decision,
   DengueCase,
   Incident,
-  IncidentDetail,
   IncidentReport,
   IncidentStatus,
   LayerKey,
@@ -18,7 +17,6 @@ import type {
   Report,
   ReportFilter,
   Role,
-  SourceType,
   StaffUser,
   CurrentUser,
   Toast,
@@ -33,7 +31,6 @@ import type {
 import { INC_STATUS, RISK } from '../theme';
 import { AGES, CASE_ZONES, HOSPITALS, SITES, ZONES } from '../data/zones';
 import { mkCases, pick } from '../data/mock';
-import { INCIDENTS, DECISIONS, ROLES } from '../data/incidents';
 import { mkTraps } from '../data/traps';
 import { uuid } from '../utils/uuid';
 import { loadLS, saveLS } from '../utils/storage';
@@ -187,7 +184,6 @@ export interface AppState {
   setIotAlertOpen: (open: boolean) => void;
   setActiveIncident: (id: string | null) => void;
   setIncReport: (r: IncidentReport | null) => void;
-  getIncident: (id: string | null) => IncidentDetail | null;
   setIncidentStatus: (id: string, status: IncidentStatus) => void;
   updateDecision: (id: string, action: 'approve' | 'override', reason?: string | null) => void;
   setOverrideDec: (id: string | null) => void;
@@ -220,7 +216,7 @@ function mapWorkOrder(o: any, reportMap: Map<string, Report>, zoneMap: Map<strin
     site_type: r?.site_type ?? 'Stagnant Water',
     remediation_action: o.remediation_action || r?.remediation_action || 'Apply Larvicide',
     guidance_text: r?.guidance_text ?? 'Vector inspection.',
-    larvae_visible: r?.larvae_visible ?? false,
+    larvae_visible: r?.larvae_visible ?? 'unclear',
     image_url: o.follow_up_image_url || null,
     description: r?.description || '',
     ndcu_instructions: o.notes || '',
@@ -525,9 +521,9 @@ export const useStore = create<AppState>((set, get) => ({
       needs_human_review: false,
       remediation_action: 'Source reduction + larvicide',
       site_type: SITES[Math.floor(Math.random() * SITES.length)],
-      larvae_visible: true,
+      larvae_visible: 'yes',
       guidance_text: 'Empty and scrub the container. Apply larvicide.',
-      ai_analysis: { water_present: true, site_type: 'Container', larvae_visible: true, reasoning: 'Demo synthetic breeding site.' },
+      ai_analysis: { water_present: true, site_type: 'Container', larvae_visible: 'yes', reasoning: 'Demo synthetic breeding site.' },
       zone_id: z.zone_id,
       zone_name: z.name,
       created_at: new Date().toISOString(),
@@ -629,7 +625,7 @@ export const useStore = create<AppState>((set, get) => ({
       remediation_action: 'Source reduction',
       guidance_text:
         'Locate the flagged container and remove standing water. Apply larvicide and record before/after photos.',
-      larvae_visible: inc.risk_level === 'critical' || inc.risk_level === 'high',
+      larvae_visible: (inc.risk_level === 'critical' || inc.risk_level === 'high') ? 'yes' : 'no',
       image_url: null,
       description: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
       incident_id: inc.incident_id,
@@ -660,7 +656,7 @@ export const useStore = create<AppState>((set, get) => ({
       remediation_action: 'Inspect trap site',
       guidance_text:
         'Inspect the area around trap ' + t.serial_number + '. Reason: ' + reason + '. Check for nearby breeding sources, remove standing water, and verify the trap hardware and battery.',
-      larvae_visible: t.readings.larvae_detected,
+      larvae_visible: t.readings.larvae_detected ? 'yes' : 'no',
       image_url: null,
       description: 'Trap ' + t.serial_number + ' (' + t.zone_name + ') — ' + reason,
       ndcu_instructions: '',
@@ -691,8 +687,8 @@ export const useStore = create<AppState>((set, get) => ({
       get().toast('Notes must be at least 10 characters', 'error');
       return;
     }
-    const rl = window.prompt('Verified risk level after remediation (low / medium / high / critical):', 'low');
-    const validRl = ['low', 'medium', 'high', 'critical'];
+    const rl = window.prompt('Verified risk level after remediation (none / low / medium / high / critical):', 'none');
+    const validRl = ['none', 'low', 'medium', 'high', 'critical'];
     const verifiedRl = rl && validRl.includes(rl.toLowerCase()) ? rl.toLowerCase() : undefined;
     try {
       await api.resolveWorkOrder(woId, notes, verifiedRl);
@@ -810,40 +806,6 @@ export const useStore = create<AppState>((set, get) => ({
   setIotAlertOpen: (iotAlertOpen) => set({ iotAlertOpen }),
   setActiveIncident: (id) => set({ activeIncident: id, overrideDec: null, incReport: id ? get().incReport : null }),
   setIncReport: (r) => set({ incReport: r }),
-
-  getIncident: (id) => {
-    const s = get();
-    const inc = s.incidents.find((x) => x.incident_id === id);
-    if (!inc) return null;
-    const reports: IncidentReport[] = [];
-    const base = new Date(inc.created_at).getTime();
-    for (let i = 0; i < inc.confirmation_count; i++) {
-      const role = i === 0 ? 'Community reporter' : ROLES[(i + 1) % ROLES.length];
-      const source_type: SourceType = i === 0 ? 'community' : role === 'Drone operator' ? 'drone' : 'community';
-      reports.push({
-        report_id: i === 0 ? inc.primary_report_id : inc.code + '-C' + i,
-        role,
-        source_type,
-        submitted_at: new Date(base + i * 37 * 60000).toISOString(),
-        risk_level: inc.risk_level,
-        confidence: 72 + ((i * 7) % 26),
-        primary: i === 0,
-        site_type: inc.site_type,
-        lat: inc.lat + (i ? i * 0.0004 - 0.0006 : 0),
-        lng: inc.lng + (i ? i * 0.0003 - 0.0004 : 0),
-        zone_name: inc.zone_name,
-        incident_id: inc.incident_id,
-        larvae_visible: (inc.risk_level === 'critical' || inc.risk_level === 'high') && i % 2 === 0,
-        water_present: i % 3 !== 0,
-        notes:
-          i === 0
-            ? 'Standing water observed at the site; container actively holding water after recent rain.'
-            : 'Confirms the same site ' + (10 + i * 6) + ' m from the first report — condition unchanged.',
-      });
-    }
-    const decisions = s.decisions.filter((d) => d.matched_incident_id === id);
-    return { inc, reports, decisions };
-  },
 
   setIncidentStatus: async (id, status) => {
     try {

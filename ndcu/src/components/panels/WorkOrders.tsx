@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RISK } from '../../theme';
-import { tago } from '../../utils/format';
+import { tago, siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import type { WorkOrderStatus } from '../../types';
 import IotAlertPanel from './IotAlertPanel';
@@ -180,7 +180,7 @@ export default function WorkOrders() {
                       </div>
                     </td>
                     <td style={{ padding: '10px 14px', fontWeight: 600 }}>{o.zone_name}</td>
-                    <td style={{ padding: '10px 14px', color: '#334b45' }}>{o.site_type}</td>
+                    <td style={{ padding: '10px 14px', color: '#334b45' }}>{siteTypeLabel(o.site_type)}</td>
                     <td style={{ padding: '10px 14px', color: o.assigned_to ? '#334b45' : '#c0392b', fontWeight: o.assigned_to ? 400 : 600 }}>
                       {o.assigned_to ? o.assigned_to.name : 'Unassigned'}
                     </td>

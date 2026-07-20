@@ -1,4 +1,4 @@
-import { Role, RiskLevel, SiteType, Language, WorkOrderStatus, ReportStatus, SourceType } from '../config/constants';
+import { Role, RiskLevel, SiteType, Language, WorkOrderStatus, ReportStatus, SourceType, LarvaeVisibility } from '../config/constants';
 
 /**
  * types/domain.types.ts — Shared TypeScript domain types.
@@ -6,7 +6,7 @@ import { Role, RiskLevel, SiteType, Language, WorkOrderStatus, ReportStatus, Sou
  * Re-exports string-literal types derived from constants.ts.
  */
 
-export type { Role, RiskLevel, SiteType, Language, WorkOrderStatus, ReportStatus, SourceType };
+export type { Role, RiskLevel, SiteType, Language, WorkOrderStatus, ReportStatus, SourceType, LarvaeVisibility };
 
 // ─── Database row types ───────────────────────────────────────────────────────
 
@@ -128,10 +128,14 @@ export interface AiAnalysisResult {
   site_type: SiteType;
   risk_level: RiskLevel;
   confidence_score: number;
+  water_present: boolean;
+  larvae_visible: LarvaeVisibility;
   breeding_indicators: string[];
   guidance_text: string;
   remediation_action: string;
+  is_dengue_risk: boolean;
   needs_human_review: boolean;
+  reasoning?: string;
   raw_response: Record<string, unknown>;
 }
 

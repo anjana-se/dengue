@@ -14,4 +14,5 @@ export const GUIDE: Record<RiskLevel, string> = {
   medium:
     "Some standing water detected. Tip it out and keep the area dry. Check again after the next rain.",
   low: "Low risk, but keep the area free of standing water and check weekly during the monsoon season.",
+  none: "No breeding risk detected. Keep the area free of standing water and check again after the next rain.",
 };

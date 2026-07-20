@@ -47,7 +47,7 @@ export type AcceptWorkorderInput = z.infer<typeof acceptWorkorderSchema>;
 export const resolveWorkorderSchema = z.object({
   resolution_notes: z.string().min(10, 'Please describe the remediation action taken').max(2000),
   // PHI can override AI risk level if field inspection differs
-  verified_risk_level: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  verified_risk_level: z.enum(['none', 'low', 'medium', 'high', 'critical']).optional(),
 });
 
 export type ResolveWorkorderInput = z.infer<typeof resolveWorkorderSchema>;

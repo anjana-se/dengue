@@ -31,7 +31,7 @@ export const listReportsSchema = z.object({
   status: z
     .enum(['pending', 'processing', 'complete', 'needs_human_review', 'failed'])
     .optional(),
-  risk_level: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  risk_level: z.enum(['none', 'low', 'medium', 'high', 'critical']).optional(),
   source_type: z.enum(['community', 'drone']).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
@@ -44,7 +44,7 @@ export type ListReportsQuery = z.infer<typeof listReportsSchema>;
 export const reviewReportSchema = z.object({
   notes: z.string().max(2000).optional(),
   // PHI can override the AI risk level after physical inspection
-  risk_level: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  risk_level: z.enum(['none', 'low', 'medium', 'high', 'critical']).optional(),
 });
 
 export type ReviewReportInput = z.infer<typeof reviewReportSchema>;

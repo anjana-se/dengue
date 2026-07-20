@@ -36,7 +36,7 @@ export default function MapLegend() {
   const rows: ReactNode[] = [];
   if (layers.community !== false) {
     rows.push(<Sec key="s-rep">Breeding site reports</Sec>);
-    (['critical', 'high', 'medium', 'low'] as const).forEach((k) => rows.push(<Dot key={'r-' + k} c={RISK[k].c} label={RISK[k].label} />));
+    (['critical', 'high', 'medium', 'low', 'none'] as const).forEach((k) => rows.push(<Dot key={'r-' + k} c={RISK[k].c} label={RISK[k].label} />));
   }
   if (layers.zones) {
     rows.push(<Sec key="s-zone">Zone shading</Sec>);

@@ -64,9 +64,9 @@ export async function analyzeBreedingSiteImage(
   });
 
   const rawText = response.response.text();
-  logger.debug('Gemini vision response received', {
+  logger.info('Gemini vision response received', {
     responseLength: rawText.length,
-    preview: rawText.slice(0, 100),
+    preview: JSON.parse(rawText),
   });
 
   const parsed = parseVisionResponse(rawText);

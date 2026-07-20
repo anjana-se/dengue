@@ -30,6 +30,7 @@ export function riskLevelToColor(level: RiskLevel): string {
     high:     '#ea580c',   // orange-600
     medium:   '#ca8a04',   // yellow-600
     low:      '#16a34a',   // green-600
+    none:     '#9ca3af',   // gray-400
   };
   return colors[level];
 }

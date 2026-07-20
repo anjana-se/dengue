@@ -19,13 +19,14 @@ export const color = {
   panel: "#F0F6F2",
 } as const;
 
-export type RiskLevel = "critical" | "high" | "medium" | "low";
+export type RiskLevel = "critical" | "high" | "medium" | "low" | "none";
 
 export const RISK: Record<RiskLevel, { color: string; bg: string; thumb: string }> = {
   critical: { color: "#B91C1C", bg: "#FEE2E2", thumb: "linear-gradient(135deg,#991B1B,#B91C1C)" },
   high: { color: "#C2410C", bg: "#FFEDD5", thumb: "linear-gradient(135deg,#C2410C,#EA580C)" },
   medium: { color: "#A16207", bg: "#FEF3C7", thumb: "linear-gradient(135deg,#A16207,#CA8A04)" },
   low: { color: "#4D7C0F", bg: "#ECFCCB", thumb: "linear-gradient(135deg,#3F6212,#65A30D)" },
+  none: { color: "#4B5563", bg: "#F3F4F6", thumb: "linear-gradient(135deg,#6B7280,#9CA3AF)" },
 };
 
 /** Status → badge palette (see reportVM in the design). */

@@ -18,6 +18,7 @@ export const RISK: Record<RiskLevel, { c: string; bg: string; label: string }> =
   high: { c: '#F59E0B', bg: '#FEF5E6', label: 'High' },
   medium: { c: '#3B82F6', bg: '#ECF3FE', label: 'Medium' },
   low: { c: '#10B981', bg: '#E7F7F0', label: 'Low' },
+  none: { c: '#6B7280', bg: '#F3F4F6', label: 'None' },
 };
 
 export const CASE_SEV: Record<Severity, { c: string; label: string; w: number }> = {

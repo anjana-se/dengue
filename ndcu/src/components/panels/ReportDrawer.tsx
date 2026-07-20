@@ -1,5 +1,5 @@
 import { PRIMARY, RISK } from '../../theme';
-import { timf } from '../../utils/format';
+import { timf, siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
@@ -19,9 +19,9 @@ export default function ReportDrawer() {
   const hasWO = orders.some((o) => o.zone_id === r.zone_id && o.site_type === r.site_type && o.status !== 'resolved');
 
   const facts: [string, string][] = [
-    ['Site type', r.site_type],
+    ['Site type', siteTypeLabel(r.site_type)],
     ['Water present', r.ai_analysis.water_present ? 'Yes' : 'No'],
-    ['Larvae visible', r.larvae_visible ? 'Yes ⚠' : 'No'],
+    ['Larvae visible', r.larvae_visible === 'yes' ? 'Yes ⚠' : r.larvae_visible === 'no' ? 'No' : 'Unclear'],
     ['Source', r.source_type],
   ];
 
@@ -57,7 +57,7 @@ export default function ReportDrawer() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ fontSize: 18, fontWeight: 700 }}>{r.site_type}</span>
+        <span style={{ fontSize: 18, fontWeight: 700 }}>{siteTypeLabel(r.site_type)}</span>
         <Badge level={r.risk_level} />
       </div>
       <div style={{ fontSize: 13, color: '#6b7c77', marginBottom: 16 }}>

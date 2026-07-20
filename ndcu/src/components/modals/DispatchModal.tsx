@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { PRIMARY } from '../../theme';
+import { siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import type { Phi } from '../../types';
 
@@ -41,7 +42,7 @@ export default function DispatchModal() {
       >
         <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>Dispatch team</div>
         <div style={{ fontSize: 13, color: '#6b7c77', marginBottom: 20 }}>
-          {o.zone_name} · {o.site_type}
+          {o.zone_name} · {siteTypeLabel(o.site_type)}
         </div>
 
         <label style={{ fontSize: 12, fontWeight: 600, color: '#334b45', display: 'block', marginBottom: 6 }}>

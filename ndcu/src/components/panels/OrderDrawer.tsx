@@ -1,5 +1,5 @@
 import { PRIMARY, RISK } from '../../theme';
-import { timf } from '../../utils/format';
+import { timf, siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
@@ -18,7 +18,7 @@ export default function OrderDrawer() {
   const meta: [string, string][] = [
     ['Assigned to', o.assigned_to ? o.assigned_to.name : 'Unassigned'],
     ['Confidence', o.confidence + '%'],
-    ['Larvae visible', o.larvae_visible ? 'Yes ⚠' : 'No'],
+    ['Larvae visible', o.larvae_visible === 'yes' ? 'Yes ⚠' : o.larvae_visible === 'no' ? 'No' : 'Unclear'],
     ['Created', timf(o.created_at)],
     ...(o.resolved_at ? [['Resolved', timf(o.resolved_at)] as [string, string]] : []),
   ];
@@ -30,7 +30,7 @@ export default function OrderDrawer() {
         <Badge level={o.risk_level} />
       </div>
       <div style={{ fontSize: 13, color: '#6b7c77', marginBottom: 16 }}>
-        {o.site_type} · Priority {o.priority_score}
+        {siteTypeLabel(o.site_type)} · Priority {o.priority_score}
       </div>
 
       {/* GPS */}

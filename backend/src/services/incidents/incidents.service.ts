@@ -17,10 +17,22 @@ export async function getIncidentDetail(id: string) {
   const inc = await incidentsQueries.getIncidentById(id);
   if (!inc) return null;
 
-  // Get reports associated with this incident
+  // Get reports associated with this incident (real per-report analysis,
+  // including ai_analysis so larvae_visible/water_present reflect the actual
+  // model output rather than being derived from risk level on the client).
   const reportsRes = await pool.query(
-    `SELECT id AS report_id, source_type AS role, created_at AS submitted_at, risk_level, confidence_score AS confidence,
-            id = $2 AS primary
+    `SELECT id AS report_id,
+            source_type,
+            created_at AS submitted_at,
+            risk_level,
+            confidence_score,
+            site_type,
+            latitude AS lat,
+            longitude AS lng,
+            location_name,
+            notes,
+            ai_analysis,
+            (id = $2) AS primary
      FROM reports
      WHERE incident_id = $1
      ORDER BY created_at ASC`,
@@ -48,10 +60,24 @@ export async function getIncidentDetail(id: string) {
       resolved_at: inc.resolved_at,
       site_type: inc.site_type,
     },
-    reports: reportsRes.rows.map((r: any) => ({
-      ...r,
-      site_type: inc.site_type,
-    })),
+    reports: reportsRes.rows.map((r: any) => {
+      const ai = r.ai_analysis && typeof r.ai_analysis === 'object' ? r.ai_analysis : {};
+      return {
+        report_id: r.report_id,
+        source_type: r.source_type,
+        submitted_at: r.submitted_at,
+        risk_level: r.risk_level,
+        confidence_score: r.confidence_score,
+        site_type: r.site_type || inc.site_type,
+        lat: r.lat,
+        lng: r.lng,
+        location_name: r.location_name || inc.zone_name,
+        notes: r.notes,
+        larvae_visible: ai.larvae_visible ?? null,
+        water_present: ai.water_present ?? null,
+        primary: r.primary,
+      };
+    }),
     decisions: decisions.map((d: any) => ({
       decision_id: d.id,
       new_report_id: d.new_report_id,

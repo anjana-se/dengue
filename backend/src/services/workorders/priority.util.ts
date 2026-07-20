@@ -23,6 +23,7 @@ const RISK_BASE: Record<RiskLevel, number> = {
   high:     40,
   medium:   20,
   low:       5,
+  none:      0,
 };
 
 export interface PriorityInputs {

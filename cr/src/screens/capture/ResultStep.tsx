@@ -1,5 +1,6 @@
 import { useI18n } from "../../i18n/LanguageProvider";
 import { heroButtonStyle } from "../../components/ui";
+import { siteTypeLabel } from "../../lib/format";
 import type { AnalysisResult } from "../../types";
 
 interface ResultStepProps {
@@ -87,7 +88,7 @@ export function ResultStep({ result, guidanceText, onReportAnother, onViewReport
               animation: "dgpulse 1.4s infinite",
             }}
           />
-          {result ? `${result.siteType} (${result.confidence}%)` : t("status_processing")}
+          {result ? `${siteTypeLabel(result.siteType)} (${result.confidence}%)` : t("status_processing")}
         </div>
 
         {guidanceText && (

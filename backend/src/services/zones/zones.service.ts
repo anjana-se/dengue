@@ -102,7 +102,7 @@ export async function recomputeZoneRisk(zoneId: string): Promise<void> {
        COUNT(*) FILTER (WHERE risk_level = 'high') AS high_count,
        COUNT(*) FILTER (WHERE risk_level = 'medium') AS medium_count,
        COUNT(*) FILTER (WHERE risk_level = 'low' OR risk_level IS NULL) AS other_count,
-       COUNT(*) FILTER (WHERE (ai_analysis->>'larvae_visible')::boolean = true OR 'larvae' = ANY(breeding_indicators)) AS larvae_count
+       COUNT(*) FILTER (WHERE ai_analysis->>'larvae_visible' = 'yes' OR 'larvae' = ANY(breeding_indicators)) AS larvae_count
      FROM reports
      WHERE zone_id = $1
        AND status IN ('pending', 'processing', 'complete', 'needs_human_review')`,

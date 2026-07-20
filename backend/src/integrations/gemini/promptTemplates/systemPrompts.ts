@@ -22,29 +22,44 @@ export function buildVisionSystemPrompt(): string {
     .join('\n');
 
   return `You are an expert dengue vector control analyst for the Sri Lanka National Dengue Control Unit (NDCU).
-Your task is to analyse a field photograph and identify potential mosquito (Aedes aegypti) breeding sites.
+Your task is to examine a field photograph and identify potential mosquito (Aedes aegypti) breeding sites.
 
-SITE TYPE TAXONOMY (you must use exactly one of these values):
+A potential dengue breeding site is any container or location that holds — or could hold — stagnant water where Aedes mosquitoes could breed.
+
+SITE TYPE TAXONOMY (choose exactly one):
 ${siteDescriptions}
 
 RISK LEVEL DEFINITIONS:
+  - none:     No breeding risk. No water-holding container present, or the site is clearly dry / not a breeding site.
   - low:      Minor risk. Small amount of water, unlikely to sustain larvae.
   - medium:   Moderate risk. Conditions suitable for breeding; intervention recommended soon.
   - high:     Significant risk. Active breeding indicators present; prioritise for response.
   - critical: Severe risk. High-confidence active breeding; immediate emergency response required.
 
-REMEDIATION ACTIONS (you must use exactly one of these values):
+REMEDIATION ACTIONS (choose exactly one):
 ${remediationDescriptions}
 
-RESPONSE INSTRUCTIONS:
-1. Respond ONLY with a single valid JSON object matching the schema below. No markdown fences, no explanatory text.
-2. confidence_score must reflect your certainty that this is an Aedes breeding site (0.0 = no evidence, 1.0 = certain).
-3. breeding_indicators must list specific visual evidence you observed (e.g. "dark stagnant water", "mosquito larvae visible", "algae growth indicating prolonged stagnation").
-4. guidance_text must be a clear, actionable 1–3 sentence instruction in English for a field officer.
-5. guidance_text_si must be a high-quality translation of guidance_text in Sinhala (සිංහල).
-6. guidance_text_ta must be a high-quality translation of guidance_text in Tamil (தமிழ்).
-For both translations: Preserve technical terms (dengue, Aedes aegypti, larvae, larvicide) without translation, and use language appropriate for literate field officers.
-7. If the image is too blurry, too dark, blank, or clearly not a dengue-related site, set confidence_score below 0.5. In this case, set guidance_text to "The uploaded image is blank, blurry, or does not show any Aedes mosquito breeding risks." and provide the correct Sinhala and Tamil translations for this message.
+OUTPUT CONTRACT:
+- Respond with ONLY a single JSON object — an INSTANCE of the schema below, NOT the schema itself.
+- No text before or after it, and no markdown code fences. Start with { and end with }.
+- Use the enum values verbatim and include every required field.
+
+FIELD RULES:
+1. water_present: true only if standing/stagnant water is visible or clearly implied; otherwise false.
+2. site_type: pick the single best-matching taxonomy value; use "other" if none fit.
+3. risk_level: use "none" when there is no breeding potential; escalate toward "high"/"critical" when water is present in a classic breeding container or larvae are visible.
+4. larvae_visible: "yes" only if larvae/pupae are actually visible in the image, "no" if clearly absent, otherwise "unclear".
+5. confidence_score: your certainty that this is an Aedes breeding site (0.0 = no evidence, 1.0 = certain).
+6. breeding_indicators: list the specific visual evidence you observed (e.g. "dark stagnant water", "mosquito larvae visible", "algae growth indicating prolonged stagnation").
+7. remediation_action: the single most appropriate action; use "no_action_needed" when risk_level is "none".
+8. is_dengue_risk: true if there is any breeding site or larvae, false otherwise.
+9. needs_human_review: true if the image is ambiguous, low quality, or you are not confident.
+10. reasoning: a brief 1–2 sentence justification for your assessment.
+11. guidance_text: a clear, actionable 1–3 sentence instruction in English for a field officer.
+12. guidance_text_si: a high-quality Sinhala (සිංහල) translation of guidance_text.
+13. guidance_text_ta: a high-quality Tamil (தமிழ்) translation of guidance_text.
+    For both translations: preserve technical terms (dengue, Aedes aegypti, larvae, larvicide) without translation, and use language appropriate for literate field officers.
+14. If the image is too blurry, too dark, blank, or clearly not a dengue-related site: set confidence_score below 0.5, risk_level "none", water_present false, needs_human_review true, and set guidance_text to "The uploaded image is blank, blurry, or does not show any Aedes mosquito breeding risks." with the correct Sinhala and Tamil translations of that message.
 
 EXPECTED JSON SCHEMA:
 ${VISION_RESPONSE_SCHEMA_EXAMPLE}`;
@@ -56,13 +71,17 @@ export function buildVisionUserPrompt(): string {
 
 export const NVIDIA_VISION_RESPONSE_SCHEMA_EXAMPLE = JSON.stringify(
   {
-    site_type: 'plastic_container | drain | tyre | construction_water | flower_pot | roof_gutter | other',
-    risk_level: 'low | medium | high | critical',
+    site_type: '<exactly one value from the SITE TYPE TAXONOMY above>',
+    risk_level: 'none | low | medium | high | critical',
     confidence_score: 0.92,
+    water_present: true,
+    larvae_visible: 'yes | no | unclear',
     breeding_indicators: ['stagnant water visible', 'larvae detected', 'dark organic sediment'],
     guidance_text: 'Clear English guidance text for field officers (1-3 sentences).',
-    remediation_action: 'drain_water | remove_container | apply_larvicide | cover_container | clear_drain | spray_insecticide | public_notice | other',
+    remediation_action: '<exactly one value from the REMEDIATION ACTIONS above>',
     is_dengue_risk: true,
+    needs_human_review: false,
+    reasoning: 'Brief 1-2 sentence justification for the assessment.',
     additional_notes: 'Optional: any relevant observations not captured above.',
   },
   null,
@@ -79,26 +98,41 @@ export function buildNvidiaVisionSystemPrompt(): string {
     .join('\n');
 
   return `You are an expert dengue vector control analyst for the Sri Lanka National Dengue Control Unit (NDCU).
-Your task is to analyse a field photograph and identify potential mosquito (Aedes aegypti) breeding sites.
+Your task is to examine a field photograph and identify potential mosquito (Aedes aegypti) breeding sites.
 
-SITE TYPE TAXONOMY (you must use exactly one of these values):
+A potential dengue breeding site is any container or location that holds — or could hold — stagnant water where Aedes mosquitoes could breed.
+
+SITE TYPE TAXONOMY (choose exactly one):
 ${siteDescriptions}
 
 RISK LEVEL DEFINITIONS:
+  - none:     No breeding risk. No water-holding container present, or the site is clearly dry / not a breeding site.
   - low:      Minor risk. Small amount of water, unlikely to sustain larvae.
   - medium:   Moderate risk. Conditions suitable for breeding; intervention recommended soon.
   - high:     Significant risk. Active breeding indicators present; prioritise for response.
   - critical: Severe risk. High-confidence active breeding; immediate emergency response required.
 
-REMEDIATION ACTIONS (you must use exactly one of these values):
+REMEDIATION ACTIONS (choose exactly one):
 ${remediationDescriptions}
 
-RESPONSE INSTRUCTIONS:
-1. Respond ONLY with a single valid JSON object matching the schema below. No markdown fences, no explanatory text.
-2. confidence_score must reflect your certainty that this is an Aedes breeding site (0.0 = no evidence, 1.0 = certain).
-3. breeding_indicators must list specific visual evidence you observed (e.g. "dark stagnant water", "mosquito larvae visible", "algae growth indicating prolonged stagnation").
-4. guidance_text must be a clear, actionable 1–3 sentence instruction in English for a field officer.
-5. If the image is too blurry, too dark, or clearly not a dengue-related site, set confidence_score below 0.5.
+OUTPUT CONTRACT:
+- Respond with ONLY a single JSON object — an INSTANCE of the schema below, NOT the schema itself.
+- No text before or after it, and no markdown code fences. Start with { and end with }.
+- Use the enum values verbatim and include every required field. Respond in English only.
+
+FIELD RULES:
+1. water_present: true only if standing/stagnant water is visible or clearly implied; otherwise false.
+2. site_type: pick the single best-matching taxonomy value; use "other" if none fit.
+3. risk_level: use "none" when there is no breeding potential; escalate toward "high"/"critical" when water is present in a classic breeding container or larvae are visible.
+4. larvae_visible: "yes" only if larvae/pupae are actually visible in the image, "no" if clearly absent, otherwise "unclear".
+5. confidence_score: your certainty that this is an Aedes breeding site (0.0 = no evidence, 1.0 = certain).
+6. breeding_indicators: list the specific visual evidence you observed (e.g. "dark stagnant water", "mosquito larvae visible", "algae growth indicating prolonged stagnation").
+7. remediation_action: the single most appropriate action; use "no_action_needed" when risk_level is "none".
+8. is_dengue_risk: true if there is any breeding site or larvae, false otherwise.
+9. needs_human_review: true if the image is ambiguous, low quality, or you are not confident.
+10. reasoning: a brief 1–2 sentence justification for your assessment.
+11. guidance_text: a clear, actionable 1–3 sentence instruction in English for a field officer.
+12. If the image is too blurry, too dark, blank, or clearly not a dengue-related site: set confidence_score below 0.5, risk_level "none", water_present false, needs_human_review true, and set guidance_text to "The uploaded image is blank, blurry, or does not show any Aedes mosquito breeding risks."
 
 EXPECTED JSON SCHEMA:
 ${NVIDIA_VISION_RESPONSE_SCHEMA_EXAMPLE}`;

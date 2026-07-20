@@ -58,12 +58,18 @@ export function parseVisionResponse(rawText: string): ParsedAnalysisResult {
 
   const data = result.data;
   const confidenceThreshold = config.AI_ANALYSIS_CONFIDENCE_THRESHOLD;
-  const needs_human_review = data.confidence_score < confidenceThreshold;
+  const belowThreshold = data.confidence_score < confidenceThreshold;
+  // Combine the confidence gate with the model's own self-assessment. This can
+  // only ever make the gate MORE conservative (flag more for review) — the
+  // appropriate default for health-surveillance decisions.
+  const needs_human_review = belowThreshold || data.needs_human_review === true;
 
   if (needs_human_review) {
-    logger.info('Report flagged for human review (low confidence)', {
+    logger.info('Report flagged for human review', {
       confidence: data.confidence_score,
       threshold: confidenceThreshold,
+      belowThreshold,
+      modelFlagged: data.needs_human_review === true,
     });
   }
 

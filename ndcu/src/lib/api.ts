@@ -1,4 +1,4 @@
-import type { Report, WorkOrder, Zone, SourceType, ReportStatus, WorkOrderStatus, StaffUser, CurrentUser, DengueCase, Trap, Incident, IncidentDetail, Decision } from '../types';
+import type { Report, WorkOrder, Zone, SourceType, ReportStatus, WorkOrderStatus, StaffUser, CurrentUser, DengueCase, Trap, Incident, IncidentDetail, IncidentReport, Decision, LarvaeVisible } from '../types';
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:3000/api/v1';
 
@@ -9,6 +9,14 @@ interface TokenPair {
 
 // Legacy hardcoded zone coords removed — zones are now dynamic with real NSDI geometry
 const ZONE_COORDS: Record<string, [number, number][]> = {};
+
+// Normalise the AI larvae_visible signal (now 'yes'|'no'|'unclear'; older rows may
+// be boolean or absent) into the LarvaeVisible enum used across the UI.
+const normalizeLarvae = (v: unknown): LarvaeVisible => {
+  if (v === 'yes' || v === 'no' || v === 'unclear') return v;
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  return 'unclear';
+};
 
 const getLocal = (key: string): string | null => {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -195,12 +203,12 @@ export const api = {
         needs_human_review: statusRaw === 'needs_human_review',
         remediation_action: r.remediation_action || 'Apply Larvicide',
         site_type: r.site_type || 'Stagnant Water',
-        larvae_visible: !!ai.larvae_visible,
+        larvae_visible: normalizeLarvae(ai.larvae_visible),
         guidance_text: r.guidance_text || 'Perform standard vector inspection.',
         ai_analysis: {
           water_present: !!ai.water_present,
           site_type: r.site_type || 'Container',
-          larvae_visible: !!ai.larvae_visible,
+          larvae_visible: normalizeLarvae(ai.larvae_visible),
           reasoning: ai.reasoning || '',
         },
         zone_id: r.zone_id || '',
@@ -382,7 +390,30 @@ export const api = {
 
   async getIncidentDetail(id: string): Promise<IncidentDetail> {
     const res = await this.request(`/incidents/${id}`);
-    return res.data;
+    const d = res.data || {};
+    const inc: Incident = d.inc;
+    // Map the backend's real report rows into the IncidentReport shape.
+    // larvae_visible / water_present come straight from the stored AI analysis
+    // (no risk-level derivation), and confidence is scaled to a 0-100 percentage.
+    const reports: IncidentReport[] = (d.reports || []).map((r: any) => ({
+      report_id: r.report_id,
+      role: r.source_type === 'drone' ? 'Drone operator' : 'Community reporter',
+      source_type: (r.source_type || 'community') as SourceType,
+      submitted_at: r.submitted_at || new Date().toISOString(),
+      risk_level: ((r.risk_level || 'low') as string).toLowerCase() as any,
+      confidence: Math.round(Number(r.confidence_score ?? 0.5) * 100),
+      primary: !!r.primary,
+      site_type: r.site_type || inc?.site_type || 'other',
+      lat: r.lat != null ? Number(r.lat) : (inc?.lat ?? 0),
+      lng: r.lng != null ? Number(r.lng) : (inc?.lng ?? 0),
+      zone_name: r.location_name || inc?.zone_name || 'Unknown Zone',
+      incident_id: id,
+      larvae_visible: normalizeLarvae(r.larvae_visible),
+      water_present: !!r.water_present,
+      notes: r.notes || '',
+    }));
+    const decisions: Decision[] = d.decisions || [];
+    return { inc, reports, decisions };
   },
 
   async getDuplicateDecisions(): Promise<Decision[]> {

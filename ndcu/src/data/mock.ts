@@ -35,13 +35,13 @@ export function mkReports(): Report[] {
       needs_human_review: i % 7 === 0,
       remediation_action: 'Source reduction + larvicide',
       site_type: SITES[i % SITES.length],
-      larvae_visible: lv === 'critical' || lv === 'high',
+      larvae_visible: (lv === 'critical' || lv === 'high') ? 'yes' : 'no',
       guidance_text:
         'Empty and scrub the container. Apply larvicide to any water that cannot be removed. Advise the resident on weekly checks.',
       ai_analysis: {
         water_present: true,
         site_type: SITES[i % SITES.length],
-        larvae_visible: lv === 'critical' || lv === 'high',
+        larvae_visible: (lv === 'critical' || lv === 'high') ? 'yes' : 'no',
         reasoning:
           'Model detected clear standing water with high surface reflectance and organic debris consistent with an active breeding site. Container geometry indicates persistent water retention.',
       },
@@ -74,7 +74,7 @@ export function mkOrders(): WorkOrder[] {
       remediation_action: 'Source reduction',
       guidance_text:
         'Locate the flagged container. Remove standing water, treat with larvicide, and record before/after photos.',
-      larvae_visible: z.risk_level === 'critical',
+      larvae_visible: z.risk_level === 'critical' ? 'yes' : 'no',
       image_url: null,
       description: 'Standing water flagged by AI triage at ' + z.name + '.',
       ndcu_instructions:

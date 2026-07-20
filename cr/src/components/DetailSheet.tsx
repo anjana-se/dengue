@@ -2,6 +2,7 @@ import { useI18n } from "../i18n/LanguageProvider";
 import type { Report } from "../types";
 import { RiskBadge, StatusBadge } from "./Badges";
 import { timeAgo } from "../lib/mock";
+import { siteTypeLabel } from "../lib/format";
 
 interface DetailSheetProps {
   report: Report | null;
@@ -110,7 +111,7 @@ export function DetailSheet({ report, onClose }: DetailSheetProps) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 13, color: "#6b7a74" }}>{t("site_type_label")}</span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#1c2b26" }}>{report.siteType}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#1c2b26" }}>{siteTypeLabel(report.siteType)}</span>
           </div>
           <div style={{ height: 1, background: "#f0f4f1" }} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

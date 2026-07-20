@@ -44,3 +44,40 @@ export function datef(iso: string): string {
     year: 'numeric',
   });
 }
+
+/**
+ * Human-readable labels for the AI `site_type` enum. The stored/queried value
+ * stays the raw enum (e.g. "blocked_drain"); this is display-only.
+ */
+const SITE_TYPE_LABELS: Record<string, string> = {
+  discarded_tire: 'Discarded Tyre',
+  plastic_container: 'Plastic Container',
+  metal_container: 'Metal Container',
+  water_storage_tank_barrel: 'Water Storage Tank / Barrel',
+  flower_pot_or_saucer: 'Flower Pot / Saucer',
+  roof_gutter: 'Roof Gutter',
+  blocked_drain: 'Blocked Drain',
+  construction_site_water: 'Construction Site Water',
+  coconut_shell: 'Coconut Shell',
+  tree_hole: 'Tree Hole',
+  ornamental_pond: 'Ornamental Pond',
+  ac_or_fridge_tray: 'AC / Fridge Tray',
+  bird_bath: 'Bird Bath',
+  tarpaulin_sheeting: 'Tarpaulin Sheeting',
+  unused_well: 'Unused Well',
+  refuse_or_food_container: 'Refuse / Food Container',
+  other: 'Other',
+};
+
+/** "blocked_drain" -> "Blocked Drain". Falls back to Title-Case for any unknown/legacy value. */
+export function siteTypeLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  const mapped = SITE_TYPE_LABELS[value.toLowerCase()];
+  if (mapped) return mapped;
+  return value
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}

@@ -1,4 +1,5 @@
 import { PRIMARY } from '../../theme';
+import { siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import ReportDrawer from './ReportDrawer';
 import ReviewPanel from './ReviewPanel';
@@ -151,7 +152,7 @@ function IncidentFeed({ selZone, selectZone }: { selZone: Zone | null; selectZon
             ],
             'All severities',
           )}
-          {sel(reportSite, setReportSite, sites.map((s) => ({ v: s, l: s })), 'All site types')}
+          {sel(reportSite, setReportSite, sites.map((s) => ({ v: s, l: siteTypeLabel(s) })), 'All site types')}
           {hasSelects && (
             <button
               onClick={() => {

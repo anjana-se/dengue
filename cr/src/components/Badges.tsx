@@ -16,6 +16,7 @@ const RISK_KEY: Record<RiskLevel, StringKey> = {
   high: "risk_high",
   medium: "risk_medium",
   low: "risk_low",
+  none: "risk_none",
 };
 
 const STATUS_KEY: Record<ReportStatus, StringKey> = {

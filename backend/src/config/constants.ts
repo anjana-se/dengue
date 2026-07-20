@@ -13,12 +13,22 @@ export const RISK_THRESHOLDS = {
 
 // ─── Site-type taxonomy ──────────────────────────────────────────────────────
 export const SITE_TYPES = [
+  'discarded_tire',
   'plastic_container',
-  'drain',
-  'tyre',
-  'construction_water',
-  'flower_pot',
+  'metal_container',
+  'water_storage_tank_barrel',
+  'flower_pot_or_saucer',
   'roof_gutter',
+  'blocked_drain',
+  'construction_site_water',
+  'coconut_shell',
+  'tree_hole',
+  'ornamental_pond',
+  'ac_or_fridge_tray',
+  'bird_bath',
+  'tarpaulin_sheeting',
+  'unused_well',
+  'refuse_or_food_container',
   'other',
 ] as const;
 
@@ -66,6 +76,7 @@ export type WorkOrderStatus = (typeof WORK_ORDER_STATUS)[keyof typeof WORK_ORDER
 
 // ─── Risk levels ─────────────────────────────────────────────────────────────
 export const RISK_LEVELS = {
+  NONE: 'none',
   LOW: 'low',
   MEDIUM: 'medium',
   HIGH: 'high',
@@ -91,10 +102,16 @@ export const REMEDIATION_ACTIONS = [
   'clear_drain',
   'spray_insecticide',
   'public_notice',
+  'no_action_needed',
   'other',
 ] as const;
 
 export type RemediationAction = (typeof REMEDIATION_ACTIONS)[number];
+
+// ─── Larvae visibility (vision analysis) ─────────────────────────────────────
+export const LARVAE_VISIBILITY = ['yes', 'no', 'unclear'] as const;
+
+export type LarvaeVisibility = (typeof LARVAE_VISIBILITY)[number];
 
 // ─── AI analysis confidence gate ─────────────────────────────────────────────
 export const DEFAULT_CONFIDENCE_GATE = 0.7;

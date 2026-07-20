@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AMBER, DEC_STATUS, DEC_TYPE, INC_STATUS, PRIMARY, RISK } from '../../theme';
 import { datef, tago } from '../../utils/format';
 import { useStore } from '../../store/useStore';
+import { api } from '../../lib/api';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
 import IncReportDrawer from './IncReportDrawer';
 import type { Decision, IncidentReport, IncidentStatus } from '../../types';
 
-function ReportCard({ rp }: { rp: IncidentReport }) {
+function ReportCard({ rp, idx }: { rp: IncidentReport; idx: number }) {
   const setIncReport = useStore((s) => s.setIncReport);
   return (
     <div
@@ -24,7 +25,7 @@ function ReportCard({ rp }: { rp: IncidentReport }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: rp.primary ? PRIMARY : '#94a29d', background: rp.primary ? '#E7F7F0' : '#f2f5f4', padding: '1px 7px', borderRadius: 10 }}>
-            {rp.primary ? 'First report' : 'Confirmation ' + rp.report_id.split('-C')[1]}
+            {rp.primary ? 'First report' : 'Confirmation ' + idx}
           </span>
           <span style={{ fontSize: 11, color: '#94a29d' }}>{rp.confidence}% · {tago(rp.submitted_at)}</span>
         </div>
@@ -105,7 +106,8 @@ function DecisionRow({ d }: { d: Decision }) {
 
 export default function IncidentDrawer() {
   const activeIncident = useStore((s) => s.activeIncident);
-  const getIncident = useStore((s) => s.getIncident);
+  const inc = useStore((s) => s.incidents.find((x) => x.incident_id === activeIncident));
+  const decisions = useStore((s) => s.decisions);
   const role = useStore((s) => s.role);
   const orders = useStore((s) => s.orders);
   const setActiveIncident = useStore((s) => s.setActiveIncident);
@@ -115,13 +117,21 @@ export default function IncidentDrawer() {
   const toast = useStore((s) => s.toast);
   const incReport = useStore((s) => s.incReport);
 
-  // subscribe to incidents/decisions so the drawer re-derives on change
-  useStore((s) => s.incidents);
-  useStore((s) => s.decisions);
+  // Fetch the incident's REAL reports (with actual AI analysis) from the API.
+  // inc + decisions stay reactive from the store so status changes reflect live.
+  const [reports, setReports] = useState<IncidentReport[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeIncident) { setReports([]); return; }
+    api
+      .getIncidentDetail(activeIncident)
+      .then((d) => { if (!cancelled) setReports(d.reports); })
+      .catch(() => { if (!cancelled) setReports([]); });
+    return () => { cancelled = true; };
+  }, [activeIncident]);
 
-  const data = getIncident(activeIncident);
-  if (!data) return null;
-  const { inc } = data;
+  if (!inc) return null;
+  const incDecisions = decisions.filter((d) => d.matched_incident_id === activeIncident);
   const st = INC_STATUS[inc.status];
   const admin = role === 'ndcu_admin';
   const hasWO = orders.some((o) => o.incident_id === inc.incident_id);
@@ -158,20 +168,20 @@ export default function IncidentDrawer() {
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 9 }}>
-        Reports attached ({data.reports.length})
+        Reports attached ({reports.length})
       </div>
       <div style={{ marginBottom: 18 }}>
-        {data.reports.map((rp) => (
-          <ReportCard key={rp.report_id} rp={rp} />
+        {reports.map((rp, i) => (
+          <ReportCard key={rp.report_id} rp={rp} idx={i} />
         ))}
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 9 }}>
-        AI duplicate decisions ({data.decisions.length})
+        AI duplicate decisions ({incDecisions.length})
       </div>
-      {data.decisions.length ? (
+      {incDecisions.length ? (
         <div style={{ marginBottom: 18 }}>
-          {data.decisions.map((d) => (
+          {incDecisions.map((d) => (
             <DecisionRow key={d.decision_id} d={d} />
           ))}
         </div>

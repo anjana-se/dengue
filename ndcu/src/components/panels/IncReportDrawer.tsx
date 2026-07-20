@@ -1,5 +1,5 @@
 import { PRIMARY, RISK } from '../../theme';
-import { datef } from '../../utils/format';
+import { datef, siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
@@ -53,7 +53,7 @@ export default function IncReportDrawer() {
               borderRadius: 11,
             }}
           >
-            {r.primary ? 'First report' : 'Confirmation ' + r.report_id.split('-C')[1]}
+            {r.primary ? 'First report' : 'Confirmation'}
           </span>
           <Badge level={r.risk_level} />
         </div>
@@ -90,9 +90,9 @@ export default function IncReportDrawer() {
           {'Detected a ' +
             rk.label.toLowerCase() +
             '-risk ' +
-            r.site_type.toLowerCase() +
+            siteTypeLabel(r.site_type).toLowerCase() +
             '. ' +
-            (r.larvae_visible
+            (r.larvae_visible === 'yes'
               ? 'Larvae visible in standing water — active breeding site.'
               : r.water_present
                 ? 'Standing water present; monitor for larval development.'
@@ -106,8 +106,8 @@ export default function IncReportDrawer() {
         </div>
         {row('Report ID', r.report_id)}
         {row('Source', r.source_type === 'drone' ? 'Drone capture' : 'Community report')}
-        {row('Site type', r.site_type)}
-        {row('Larvae visible', r.larvae_visible ? 'Yes' : 'No')}
+        {row('Site type', siteTypeLabel(r.site_type))}
+        {row('Larvae visible', r.larvae_visible === 'yes' ? 'Yes' : r.larvae_visible === 'no' ? 'No' : 'Unclear')}
         {row('Standing water', r.water_present ? 'Yes' : 'No')}
         {row('Submitted', datef(r.submitted_at))}
         {row('Location', r.lat.toFixed(4) + ', ' + r.lng.toFixed(4))}

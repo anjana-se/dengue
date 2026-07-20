@@ -3,7 +3,7 @@ import { query } from '../client';
 export interface CreateIncidentInput {
   code: string;
   status: 'open' | 'verified' | 'resolved' | 'closed';
-  risk_level: 'low' | 'medium' | 'high' | 'critical';
+  risk_level: 'none' | 'low' | 'medium' | 'high' | 'critical';
   latitude: number;
   longitude: number;
   zone_id?: string;

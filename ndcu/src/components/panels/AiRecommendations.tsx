@@ -1,4 +1,5 @@
 import { PRIMARY } from '../../theme';
+import { siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import type { Report, Zone } from '../../types';
 
@@ -24,7 +25,7 @@ function buildRecommendations(zones: Zone[], reports: Report[]) {
 
   return sorted.map((z, i) => {
     const zReports = zoneReports[z.zone_id] || [];
-    const larvaeReports = zReports.filter((r) => r.larvae_visible).length;
+    const larvaeReports = zReports.filter((r) => r.larvae_visible === 'yes').length;
     const droneReports = zReports.filter((r) => r.source_type === 'drone').length;
     const siteTypes = [...new Set(zReports.map((r) => r.site_type).filter(Boolean))].slice(0, 3);
     const openOrders = z.open_orders || 0;
@@ -43,7 +44,7 @@ function buildRecommendations(zones: Zone[], reports: Report[]) {
       teams = larvaeReports > 3 ? 3 : 2;
     } else if (isHigh) {
       action = siteTypes.length > 0
-        ? `Priority larviciding — focus on ${siteTypes.join(', ')}`
+        ? `Priority larviciding — focus on ${siteTypes.map(siteTypeLabel).join(', ')}`
         : 'Priority larviciding and source reduction';
       reasoning = `${z.active_report_count} reports in zone. ${larvaeReports > 0 ? `${larvaeReports} sites confirmed larvae.` : ''} ${needsReview > 0 ? `${needsReview} reports need human review.` : ''} Upward risk trend warrants immediate action.`;
       teams = 2;

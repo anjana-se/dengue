@@ -1,6 +1,7 @@
 // ---------- Domain types for the DengueGuard Operations Portal ----------
 
-export type RiskLevel = 'critical' | 'high' | 'medium' | 'low';
+export type RiskLevel = 'critical' | 'high' | 'medium' | 'low' | 'none';
+export type LarvaeVisible = 'yes' | 'no' | 'unclear';
 export type Role = 'ndcu_admin' | 'phi' | 'drone_operator';
 export type ViewKey = 'dashboard' | 'reports' | 'workorders' | 'drone' | 'chat' | 'users';
 export type LoginTab = 'email' | 'otp';
@@ -43,7 +44,7 @@ export interface Zone {
 export interface AiAnalysis {
   water_present: boolean;
   site_type: string;
-  larvae_visible: boolean;
+  larvae_visible: LarvaeVisible;
   reasoning: string;
 }
 
@@ -59,7 +60,7 @@ export interface Report {
   needs_human_review: boolean;
   remediation_action: string;
   site_type: string;
-  larvae_visible: boolean;
+  larvae_visible: LarvaeVisible;
   guidance_text: string;
   ai_analysis: AiAnalysis;
   zone_id: string;
@@ -89,7 +90,7 @@ export interface WorkOrder {
   site_type: string;
   remediation_action: string;
   guidance_text: string;
-  larvae_visible: boolean;
+  larvae_visible: LarvaeVisible;
   image_url: string | null;
   description: string;
   ndcu_instructions: string;
@@ -276,7 +277,7 @@ export interface IncidentReport {
   lng: number;
   zone_name: string;
   incident_id: string;
-  larvae_visible: boolean;
+  larvae_visible: LarvaeVisible;
   water_present: boolean;
   notes: string;
 }
