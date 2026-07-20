@@ -69,7 +69,11 @@ export async function compareReportsNvidia(
     
     Visually compare the two images (first image is Report 1, second image is Report 2) and evaluate their location, descriptions, and site types.
     
-    Respond with ONLY a valid JSON object matching this schema:
+    RESPONSE INSTRUCTIONS:
+    1. Respond ONLY with a single valid JSON object matching the schema below. No markdown fences, no introductory or concluding text.
+    2. The JSON object must be parseable.
+    
+    EXPECTED JSON SCHEMA:
     {
       "duplicate": boolean,
       "confidence": number, // 0.0 to 1.0 representing how confident you are that they represent the same physical site
@@ -121,15 +125,37 @@ export async function compareReportsNvidia(
     const rawText = resData.choices?.[0]?.message?.content;
     if (!rawText) throw new Error('Empty response from NVIDIA NIM');
 
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON found in response');
+    // Robust JSON extraction
+    let cleanJsonStr = rawText.trim();
+    
+    // 1. Try markdown fences
+    const fenceMatch = cleanJsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+      cleanJsonStr = fenceMatch[1].trim();
+    } else {
+      // 2. Try matching from first '{' to last '}'
+      const startIdx = cleanJsonStr.indexOf('{');
+      const endIdx = cleanJsonStr.lastIndexOf('}');
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        cleanJsonStr = cleanJsonStr.substring(startIdx, endIdx + 1).trim();
+      }
+    }
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      duplicate: Boolean(parsed.duplicate),
-      confidence: parseFloat(parsed.confidence) || 0.5,
-      reasoning: parsed.reasoning || 'No reasoning provided',
-    };
+    try {
+      const parsed = JSON.parse(cleanJsonStr);
+      return {
+        duplicate: Boolean(parsed.duplicate),
+        confidence: parseFloat(parsed.confidence) || 0.5,
+        reasoning: parsed.reasoning || 'No reasoning provided',
+      };
+    } catch (parseErr: any) {
+      logger.warn('Failed to parse clean JSON from NVIDIA NIM response', {
+        rawText,
+        cleanJsonStr,
+        error: parseErr.message
+      });
+      throw new Error(`Invalid JSON format: ${parseErr.message}`);
+    }
 
   } catch (err: any) {
     logger.error('NVIDIA NIM duplicate comparison failed:', err);
