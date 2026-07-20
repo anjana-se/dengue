@@ -84,3 +84,7 @@ export function getIO(): SocketIOServer {
   if (!_io) throw new Error('Socket.IO server not initialised — call initSocketServer() first');
   return _io;
 }
+
+export function getOptionalIO(): SocketIOServer | null {
+  return _io;
+}

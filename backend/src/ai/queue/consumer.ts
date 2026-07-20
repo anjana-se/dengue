@@ -15,11 +15,11 @@ import {
   emitReportAnalysed,
   emitWorkOrderCreated,
   emitZoneUpdated,
+  emitIncidentUpdated,
 } from '../../services/notifications/notifications.service';
 import { findZoneById } from '../../db/queries/zones.queries';
 import { findNearbyIncident, createIncident, createDecision, updateIncidentStats } from '../../db/queries/incidents.queries';
 import { compareReportsNvidia } from '../../integrations/nvidia/duplicateComparison';
-import { getIO } from '../../services/notifications/socket.server';
 import type { AiAnalysisJobData } from '../../types/domain.types';
 
 
@@ -344,7 +344,7 @@ async function processJob(job: Job<AiAnalysisJobData>): Promise<void> {
     });
 
     if (incidentId) {
-      getIO().emit('incident:updated', { incident_id: incidentId });
+      emitIncidentUpdated({ incident_id: incidentId });
     }
 
     if (workOrderId) {

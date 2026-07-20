@@ -42,12 +42,9 @@ export interface ZoneUpdatedPayload {
 
 function tryGetIO() {
   try {
-    // Dynamic import avoids circular deps and allows worker process to run
-    // without a live Socket.IO server
-    const { getIO } = require('./socket.server') as typeof import('./socket.server');
-    return getIO();
+    const { getOptionalIO } = require('./socket.server') as typeof import('./socket.server');
+    return getOptionalIO();
   } catch {
-    // Worker process has no Socket.IO — log only
     return null;
   }
 }
@@ -97,3 +94,14 @@ export function emitZoneUpdated(payload: ZoneUpdatedPayload): void {
     logger.debug('[Socket stub] zone:updated', payload);
   }
 }
+
+export function emitIncidentUpdated(payload: { incident_id: string }): void {
+  const io = tryGetIO();
+  if (io) {
+    io.emit('incident:updated', payload);
+    logger.debug('[Socket] incident:updated emitted', payload);
+  } else {
+    logger.debug('[Socket stub] incident:updated', payload);
+  }
+}
+

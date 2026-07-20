@@ -1,7 +1,7 @@
 import * as incidentsQueries from '../../db/queries/incidents.queries';
 import * as reportsQueries from '../../db/queries/reports.queries';
 import * as zonesService from '../zones/zones.service';
-import { getIO } from '../notifications/socket.server';
+import { emitIncidentUpdated } from '../notifications/notifications.service';
 import { logger } from '../../shared/logger';
 import { pool } from '../../db/client';
 
@@ -154,10 +154,11 @@ export async function resolveDuplicateDecision(
   }
 
   // Push WebSocket updates
-  const io = getIO();
-  io.emit('incident:updated', { incident_id: targetIncidentId });
+  if (targetIncidentId) {
+    emitIncidentUpdated({ incident_id: targetIncidentId });
+  }
   if (decision.matched_incident_id) {
-    io.emit('incident:updated', { incident_id: decision.matched_incident_id });
+    emitIncidentUpdated({ incident_id: decision.matched_incident_id });
   }
 
   return getIncidentDetail(targetIncidentId!);
@@ -173,10 +174,10 @@ export async function updateIncidentStatus(id: string, status: string) {
     await zonesService.recomputeZoneRisk(updated.zone_id);
   }
   
-  const io = getIO();
-  io.emit('incident:updated', { incident_id: id });
+  emitIncidentUpdated({ incident_id: id });
   
   return updated;
 }
+
 
 
