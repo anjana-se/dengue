@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { openCamera, stopStream, captureFrame, fileToDataUrl, type CameraError, type CameraErrorCode } from "../../lib/camera";
-import { resolveLocation } from "../../lib/geolocation";
-import type { AnalysisResult, ResolvedLocation } from "../../types";
+import { resolveLocation, reverseGeocode, DEFAULT_LOCATION } from "../../lib/geolocation";
+import type { AnalysisResult, GeoPoint, ResolvedLocation } from "../../types";
 import type { ToastState } from "../../components/Toast";
 import { PermissionStep } from "./PermissionStep";
 import { CameraStep } from "./CameraStep";
@@ -24,6 +24,8 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
   const [step, setStep] = useState<CaptureStep>("permission");
   const [gps, setGps] = useState<GpsStatus>("idle");
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
+  // The original GPS-resolved location, kept so the user can revert manual edits.
+  const [autoLocation, setAutoLocation] = useState<ResolvedLocation | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -33,6 +35,8 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const geoAbort = useRef<AbortController | null>(null);
+  const geoEditAbort = useRef<AbortController | null>(null);
+  const geoEditTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const analyzeAbort = useRef<AbortController | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -69,12 +73,40 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
   useEffect(
     () => () => {
       geoAbort.current?.abort();
+      geoEditAbort.current?.abort();
+      if (geoEditTimer.current) clearTimeout(geoEditTimer.current);
       analyzeAbort.current?.abort();
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       stopStream(streamRef.current);
     },
     [],
   );
+
+  // Update coordinates from a manual map edit: apply the pin immediately, then
+  // refresh the human-readable zone label via a debounced reverse-geocode
+  // (Nominatim allows ~1 req/s — see geolocation.ts data-residency note).
+  const updateLocation = useCallback((point: GeoPoint) => {
+    setLocation((prev) => ({ ...point, zone: prev?.zone ?? t("location_updating") }));
+
+    if (geoEditTimer.current) clearTimeout(geoEditTimer.current);
+    geoEditAbort.current?.abort();
+    const ac = new AbortController();
+    geoEditAbort.current = ac;
+    geoEditTimer.current = setTimeout(() => {
+      reverseGeocode(point, ac.signal)
+        .then((zone) => {
+          if (!ac.signal.aborted) setLocation({ ...point, zone });
+        })
+        .catch(() => {});
+    }, 800);
+  }, [t]);
+
+  // Revert a manual edit back to the original GPS-detected location.
+  const resetToAuto = useCallback(() => {
+    if (geoEditTimer.current) clearTimeout(geoEditTimer.current);
+    geoEditAbort.current?.abort();
+    setLocation(autoLocation);
+  }, [autoLocation]);
 
   const acquireLocation = useCallback(() => {
     geoAbort.current?.abort();
@@ -85,13 +117,27 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
       .then((loc) => {
         if (!ac.signal.aborted) {
           setLocation(loc);
+          setAutoLocation(loc);
           setGps("confirmed");
         }
       })
       .catch(() => {
-        if (!ac.signal.aborted) setGps("failed");
+        if (ac.signal.aborted) return;
+        // GPS failed/denied: drop a pin on the default centre so the reporter
+        // can place it manually, and resolve its label in the background.
+        setGps("failed");
+        setLocation({ ...DEFAULT_LOCATION, zone: t("location_updating") });
+        reverseGeocode(DEFAULT_LOCATION, ac.signal)
+          .then((zone) => {
+            if (!ac.signal.aborted) {
+              setLocation((prev) =>
+                prev ? { ...prev, zone } : { ...DEFAULT_LOCATION, zone },
+              );
+            }
+          })
+          .catch(() => {});
       });
-  }, []);
+  }, [t]);
 
   const allowLocation = () => {
     setStep("camera");
@@ -131,7 +177,7 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
 
   const submitReport = useCallback(
     function submit() {
-      if (gps !== "confirmed" || !location || !photo) return;
+      if (!location || !photo) return;
 
       // Transition straight to result step as per new design
       setStep("result");
@@ -199,13 +245,16 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
           console.warn("Submit API call error (fallback to local success state):", err);
         });
     },
-    [gps, location, photo, description, lang, t],
+    [location, photo, description, lang],
   );
 
   const reportAnother = () => {
+    geoEditAbort.current?.abort();
+    if (geoEditTimer.current) clearTimeout(geoEditTimer.current);
     setStep("permission");
     setGps("idle");
     setLocation(null);
+    setAutoLocation(null);
     setPhoto(null);
     setDescription("");
     setAnalysis(null);
@@ -235,11 +284,14 @@ export function CaptureScreen({ onStepChange, showToast, onViewReports }: Captur
         photo={photo}
         gps={gps}
         location={location}
+        autoLocation={autoLocation}
         description={description}
         onDescChange={setDescription}
         stepLabelText={label}
         onRetake={retake}
         onEnableLocation={acquireLocation}
+        onLocationChange={updateLocation}
+        onResetLocation={resetToAuto}
         onSubmit={submitReport}
       />
     );

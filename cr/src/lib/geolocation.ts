@@ -26,6 +26,12 @@ export function geolocationSupported(): boolean {
   return typeof navigator !== "undefined" && "geolocation" in navigator;
 }
 
+/**
+ * Fallback map centre used when GPS is unavailable/denied, so the reporter can
+ * still place the pin manually. Colombo, Sri Lanka.
+ */
+export const DEFAULT_LOCATION: GeoPoint = { lat: 6.9271, lng: 79.8612 };
+
 /** Resolve the device's current coordinates (no reverse geocoding). */
 export function getCurrentPosition(): Promise<GeoPoint> {
   return new Promise((resolve, reject) => {

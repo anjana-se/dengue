@@ -1,8 +1,8 @@
 export type CaptureStep = "permission" | "camera" | "confirm" | "processing" | "result";
 export type GpsStatus = "idle" | "acquiring" | "confirmed" | "failed";
 
-/** "Step N of 3" label used across the capture flow. */
+/** "Step N of 2" label shown on the camera (1) and confirm (2) steps. */
 export function stepLabel(step: CaptureStep): string {
-  const n = step === "confirm" ? 2 : step === "processing" || step === "result" ? 3 : 1;
-  return `Step ${n} of 3`;
+  const n = step === "confirm" ? 2 : 1;
+  return `Step ${n} of 2`;
 }
