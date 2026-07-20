@@ -9,19 +9,47 @@ import { Zone } from '../../types/domain.types';
 export async function findZoneById(id: string): Promise<Zone | null> {
   const result = await query<Zone>(
     `SELECT id, name, district, province, risk_score, risk_level,
-            active_report_count, created_at, updated_at
+            active_report_count, ST_AsGeoJSON(geom) AS geom_json,
+            ST_Y(ST_Centroid(geom)) AS lat, ST_X(ST_Centroid(geom)) AS lng,
+            created_at, updated_at
      FROM zones WHERE id = $1`,
     [id],
   );
   return result.rows[0] ?? null;
 }
 
-export async function listZones(): Promise<Zone[]> {
+export async function listZones(filters?: {
+  risk_level?: string;
+  district?: string;
+  active_only?: boolean;
+}): Promise<Zone[]> {
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let paramIdx = 1;
+
+  if (filters?.risk_level) {
+    conditions.push(`risk_level = $${paramIdx++}`);
+    params.push(filters.risk_level);
+  }
+  if (filters?.district) {
+    conditions.push(`LOWER(district) LIKE $${paramIdx++}`);
+    params.push(`%${filters.district.toLowerCase()}%`);
+  }
+  if (filters?.active_only) {
+    conditions.push(`(risk_score > 0 OR active_report_count > 0)`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
   const result = await query<Zone>(
     `SELECT id, name, district, province, risk_score, risk_level,
-            active_report_count, created_at, updated_at
+            active_report_count, ST_AsGeoJSON(geom) AS geom_json,
+            ST_Y(ST_Centroid(geom)) AS lat, ST_X(ST_Centroid(geom)) AS lng,
+            created_at, updated_at
      FROM zones
-     ORDER BY risk_score DESC`,
+     ${whereClause}
+     ORDER BY risk_score DESC, active_report_count DESC`,
+    params,
   );
   return result.rows;
 }
@@ -36,7 +64,9 @@ export async function findZoneByCoordinates(
 ): Promise<Zone | null> {
   const result = await query<Zone>(
     `SELECT id, name, district, province, risk_score, risk_level,
-            active_report_count, created_at, updated_at
+            active_report_count, ST_AsGeoJSON(geom) AS geom_json,
+            ST_Y(ST_Centroid(geom)) AS lat, ST_X(ST_Centroid(geom)) AS lng,
+            created_at, updated_at
      FROM zones
      WHERE ST_Within(
        ST_SetSRID(ST_MakePoint($1, $2), 4326),

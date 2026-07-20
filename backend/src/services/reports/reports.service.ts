@@ -8,6 +8,7 @@ import {
   type CreateReportInput as DbCreateReportInput,
 } from '../../db/queries/reports.queries';
 import { findZoneByCoordinates } from '../../db/queries/zones.queries';
+import { recomputeZoneRisk } from '../zones/zones.service';
 import { query as dbQuery } from '../../db/client';
 import { extractGps, isWithinSriLanka } from './exif.util';
 import { getStorage } from '../../storage';
@@ -122,6 +123,12 @@ export async function createReportService(input: CreateReportServiceInput): Prom
   const report = await dbCreateReport(dbInput);
   logger.info('Report created', { reportId: report.id, source: input.sourceType, zoneId, locationName });
 
+  if (zoneId) {
+    await recomputeZoneRisk(zoneId).catch((err) => {
+      logger.error('Failed to recompute zone risk on report creation', { zoneId, error: err.message });
+    });
+  }
+
   // ── Step 5: Enqueue AI analysis job ─────────────────────────────────────
   try {
     const { enqueueAnalysis } = await import('../../ai/queue/producer');
@@ -202,6 +209,10 @@ export async function reviewReportService(
 
   await updateReportStatus(reportId, 'processing');
   const updated = await reviewReport(reportId, reviewerUserId, input.notes);
+
+  if (updated.zone_id) {
+    await recomputeZoneRisk(updated.zone_id).catch(() => {});
+  }
 
   logger.info('Report reviewed', { reportId, reviewedBy: reviewerUserId });
   return resolveReportImageUrl(updated);

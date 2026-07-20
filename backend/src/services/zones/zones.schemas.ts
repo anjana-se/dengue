@@ -7,6 +7,7 @@ import { z } from 'zod';
 export const listZonesSchema = z.object({
   risk_level: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   district: z.string().max(100).optional(),
+  active_only: z.preprocess((val) => val === 'true' || val === true, z.boolean()).optional(),
 });
 
 export type ListZonesQuery = z.infer<typeof listZonesSchema>;

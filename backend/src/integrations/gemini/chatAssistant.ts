@@ -52,16 +52,24 @@ export async function generateChatReply(
     },
   ];
 
-  const response = await model.generateContent({
-    systemInstruction: systemPrompt,
-    contents,
-    generationConfig: {
-      temperature: 0.4,       // Slightly creative but grounded
-      maxOutputTokens: 512,   // Keep replies concise
-    },
-  });
+  try {
+    const response = await model.generateContent({
+      systemInstruction: systemPrompt,
+      contents,
+      generationConfig: {
+        temperature: 0.4,       // Slightly creative but grounded
+        maxOutputTokens: 512,   // Keep replies concise
+      },
+    });
 
-  const reply = response.response.text().trim();
-  logger.debug('Chat reply generated', { replyLength: reply.length });
-  return reply;
+    const reply = response.response.text().trim();
+    logger.debug('Chat reply generated', { replyLength: reply.length });
+    return reply;
+  } catch (err: any) {
+    logger.warn('AI chat assistant call failed, returning fallback response', { error: err.message });
+    if (err?.message?.includes('429') || err?.status === 429) {
+      return "I'm experiencing high traffic at the moment. Please try again in a few seconds. In the meantime, you can review high-risk zones and open work orders directly on the dashboard.";
+    }
+    return "I am DengueGuard Assistant. Currently, live platform telemetry and risk indicators are active. How can I assist you with vector control actions?";
+  }
 }

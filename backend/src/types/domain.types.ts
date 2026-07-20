@@ -29,7 +29,10 @@ export interface Zone {
   name: string;
   district: string;
   province: string;
-  geom: string;            // GeoJSON string or WKT from PostGIS
+  geom?: string;            // GeoJSON string or WKT from PostGIS
+  geom_json?: string;       // GeoJSON string representation
+  lat?: number;             // Centroid latitude
+  lng?: number;             // Centroid longitude
   risk_score: number;
   risk_level: RiskLevel;
   active_report_count: number;

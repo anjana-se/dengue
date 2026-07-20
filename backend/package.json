@@ -11,6 +11,9 @@
     "start:worker": "node dist/worker.js",
     "migrate": "ts-node scripts/migrate.ts",
     "seed": "ts-node scripts/seed.ts",
+    "clear:zones": "ts-node scripts/clear_zones.ts",
+    "reset:queue": "ts-node scripts/reset_ai_queue.ts",
+    "reset:all": "ts-node scripts/reset_all_reports_and_zones.ts",
     "lint": "eslint 'src/**/*.ts' 'scripts/**/*.ts'",
     "test": "jest"
   },

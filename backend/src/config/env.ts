@@ -91,3 +91,4 @@ export const isProd = config.NODE_ENV === 'production';
 export const isTest = config.NODE_ENV === 'test';
 
 export const corsOrigins = config.CORS_ALLOWED_ORIGINS.split(',').map((o) => o.trim());
+
