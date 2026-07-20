@@ -266,11 +266,19 @@ export interface Decision {
 export interface IncidentReport {
   report_id: string;
   role: string;
+  source_type: SourceType;
   submitted_at: string;
   risk_level: RiskLevel;
   confidence: number;
   primary: boolean;
   site_type: string;
+  lat: number;
+  lng: number;
+  zone_name: string;
+  incident_id: string;
+  larvae_visible: boolean;
+  water_present: boolean;
+  notes: string;
 }
 
 export interface IncidentDetail {

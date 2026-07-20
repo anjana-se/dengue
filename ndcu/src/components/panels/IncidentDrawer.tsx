@@ -4,11 +4,16 @@ import { datef, tago } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
+import IncReportDrawer from './IncReportDrawer';
 import type { Decision, IncidentReport, IncidentStatus } from '../../types';
 
 function ReportCard({ rp }: { rp: IncidentReport }) {
+  const setIncReport = useStore((s) => s.setIncReport);
   return (
-    <div style={{ display: 'flex', gap: 11, padding: '11px 13px', border: '1px solid #eef1f0', borderRadius: 10, marginBottom: 8 }}>
+    <div
+      onClick={() => setIncReport(rp)}
+      style={{ display: 'flex', gap: 11, padding: '11px 13px', border: '1px solid #eef1f0', borderRadius: 10, marginBottom: 8, cursor: 'pointer' }}
+    >
       <div style={{ width: 46, height: 46, borderRadius: 8, background: 'linear-gradient(135deg,#dbe7e3,#c4d6d0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0, color: '#5c7a72' }}>
         {rp.role === 'Drone operator' ? '✈' : '📷'}
       </div>
@@ -22,6 +27,9 @@ function ReportCard({ rp }: { rp: IncidentReport }) {
             {rp.primary ? 'First report' : 'Confirmation ' + rp.report_id.split('-C')[1]}
           </span>
           <span style={{ fontSize: 11, color: '#94a29d' }}>{rp.confidence}% · {tago(rp.submitted_at)}</span>
+        </div>
+        <div style={{ fontSize: 10.5, color: '#b3beb9', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+          View report details <span>→</span>
         </div>
       </div>
     </div>
@@ -105,6 +113,7 @@ export default function IncidentDrawer() {
   const setIncidentStatus = useStore((s) => s.setIncidentStatus);
   const createWOFromIncident = useStore((s) => s.createWOFromIncident);
   const toast = useStore((s) => s.toast);
+  const incReport = useStore((s) => s.incReport);
 
   // subscribe to incidents/decisions so the drawer re-derives on change
   useStore((s) => s.incidents);
@@ -130,6 +139,7 @@ export default function IncidentDrawer() {
   if (inc.status !== 'closed') trans.push(['closed', 'Close']);
 
   return (
+    <>
     <Drawer title="Incident" onClose={() => setActiveIncident(null)}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <span style={{ fontSize: 18, fontWeight: 700 }}>{inc.code}</span>
@@ -215,5 +225,7 @@ export default function IncidentDrawer() {
         </div>
       )}
     </Drawer>
+    {incReport && <IncReportDrawer />}
+    </>
   );
 }

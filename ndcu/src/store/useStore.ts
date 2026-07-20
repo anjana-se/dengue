@@ -18,6 +18,7 @@ import type {
   Report,
   ReportFilter,
   Role,
+  SourceType,
   StaffUser,
   CurrentUser,
   Toast,
@@ -96,6 +97,7 @@ export interface AppState {
   selPred: Prediction | null;
   selIncident: Incident | null;
   activeIncident: string | null;
+  incReport: IncidentReport | null;
   mergeSource: string | null;
   mergeQuery: string;
   overrideDec: string | null;
@@ -184,6 +186,7 @@ export interface AppState {
   setDupReviewOpen: (open: boolean) => void;
   setIotAlertOpen: (open: boolean) => void;
   setActiveIncident: (id: string | null) => void;
+  setIncReport: (r: IncidentReport | null) => void;
   getIncident: (id: string | null) => IncidentDetail | null;
   setIncidentStatus: (id: string, status: IncidentStatus) => void;
   updateDecision: (id: string, action: 'approve' | 'override', reason?: string | null) => void;
@@ -251,6 +254,7 @@ export const useStore = create<AppState>((set, get) => ({
   activeReport: null,
   activeOrder: null,
   dispatchOrder: null,
+  incReport: null,
   selZone: null,
   selPred: null,
   selIncident: null,
@@ -459,7 +463,7 @@ export const useStore = create<AppState>((set, get) => ({
   setView: (v) => {
     const allowed = allowedViews(get().role);
     if (!allowed.includes(v)) return;
-    set({ view: v, activeReport: null, activeOrder: null });
+    set({ view: v, activeReport: null, activeOrder: null, incReport: null });
     // Fetch staff users when navigating to users panel
     if (v === 'users') get().fetchStaffUsers();
   },
@@ -804,7 +808,8 @@ export const useStore = create<AppState>((set, get) => ({
   setReportSite: (reportSite) => set({ reportSite }),
   setDupReviewOpen: (dupReviewOpen) => set({ dupReviewOpen }),
   setIotAlertOpen: (iotAlertOpen) => set({ iotAlertOpen }),
-  setActiveIncident: (id) => set({ activeIncident: id, overrideDec: null }),
+  setActiveIncident: (id) => set({ activeIncident: id, overrideDec: null, incReport: id ? get().incReport : null }),
+  setIncReport: (r) => set({ incReport: r }),
 
   getIncident: (id) => {
     const s = get();
@@ -813,14 +818,27 @@ export const useStore = create<AppState>((set, get) => ({
     const reports: IncidentReport[] = [];
     const base = new Date(inc.created_at).getTime();
     for (let i = 0; i < inc.confirmation_count; i++) {
+      const role = i === 0 ? 'Community reporter' : ROLES[(i + 1) % ROLES.length];
+      const source_type: SourceType = i === 0 ? 'community' : role === 'Drone operator' ? 'drone' : 'community';
       reports.push({
         report_id: i === 0 ? inc.primary_report_id : inc.code + '-C' + i,
-        role: i === 0 ? 'Community reporter' : ROLES[(i + 1) % ROLES.length],
+        role,
+        source_type,
         submitted_at: new Date(base + i * 37 * 60000).toISOString(),
         risk_level: inc.risk_level,
         confidence: 72 + ((i * 7) % 26),
         primary: i === 0,
         site_type: inc.site_type,
+        lat: inc.lat + (i ? i * 0.0004 - 0.0006 : 0),
+        lng: inc.lng + (i ? i * 0.0003 - 0.0004 : 0),
+        zone_name: inc.zone_name,
+        incident_id: inc.incident_id,
+        larvae_visible: (inc.risk_level === 'critical' || inc.risk_level === 'high') && i % 2 === 0,
+        water_present: i % 3 !== 0,
+        notes:
+          i === 0
+            ? 'Standing water observed at the site; container actively holding water after recent rain.'
+            : 'Confirms the same site ' + (10 + i * 6) + ' m from the first report — condition unchanged.',
       });
     }
     const decisions = s.decisions.filter((d) => d.matched_incident_id === id);
