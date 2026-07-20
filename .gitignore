@@ -5,3 +5,4 @@ deploy.ps1
 deploy.sh
 dengueguard-key.pem
 dengueguard_update.zip
+update.ps1
