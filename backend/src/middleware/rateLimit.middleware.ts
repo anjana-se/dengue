@@ -13,6 +13,7 @@ export const apiRateLimiter = rateLimit({
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
   handler: (_req: Request, _res: Response, next: NextFunction) => {
     next(new TooManyRequestsError('Too many requests, please try again later', 'RATE_LIMITED'));
   },
@@ -26,6 +27,7 @@ export const authRateLimiter = rateLimit({
   max: isDev ? 1000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
   handler: (_req: Request, _res: Response, next: NextFunction) => {
     next(new TooManyRequestsError('Too many auth attempts, please try again later', 'AUTH_RATE_LIMITED'));
   },
@@ -37,6 +39,7 @@ export const emailOtpRateLimiter = rateLimit({
   max: isDev ? 1000 : 3, // max 3 requests per email
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
   keyGenerator: (req: Request) => {
     const email = req.body?.email;
     if (email && typeof email === 'string') {

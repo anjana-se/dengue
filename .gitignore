@@ -1,2 +1,7 @@
 backend.md
 .agents
+deploy.ps1
+.gitignore
+deploy.sh
+dengueguard-key.pem
+dengueguard_update.zip
