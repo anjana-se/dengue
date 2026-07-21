@@ -15,8 +15,19 @@ function ReportCard({ rp, idx }: { rp: IncidentReport; idx: number }) {
       onClick={() => setIncReport(rp)}
       style={{ display: 'flex', gap: 11, padding: '11px 13px', border: '1px solid #eef1f0', borderRadius: 10, marginBottom: 8, cursor: 'pointer' }}
     >
-      <div style={{ width: 46, height: 46, borderRadius: 8, background: 'linear-gradient(135deg,#dbe7e3,#c4d6d0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0, color: '#5c7a72' }}>
+      <div style={{ position: 'relative', overflow: 'hidden', width: 46, height: 46, borderRadius: 8, background: 'linear-gradient(135deg,#dbe7e3,#c4d6d0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0, color: '#5c7a72' }}>
+        {/* Emoji fallback underneath; a covering <img> hides it when a photo loads. */}
         {rp.role === 'Drone operator' ? '✈' : '📷'}
+        {rp.image_url && (
+          <img
+            src={rp.image_url}
+            alt="Report thumbnail"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        )}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>

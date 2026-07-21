@@ -24,8 +24,16 @@ export default function ReviewPanel() {
         <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a29d', marginBottom: 4 }}>NEW REPORT {reportRef(d.new_report_no, d.new_report_id)}</div>
-            <div style={{ height: 78, borderRadius: 8, background: 'linear-gradient(135deg,#dbe7e3,#c4d6d0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#5c7a72' }}>
+            <div style={{ position: 'relative', overflow: 'hidden', height: 78, borderRadius: 8, background: 'linear-gradient(135deg,#dbe7e3,#c4d6d0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#5c7a72' }}>
               📷
+              {d.new_image_url && (
+                <img
+                  src={d.new_image_url}
+                  alt="New report photo"
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
@@ -34,8 +42,16 @@ export default function ReviewPanel() {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a29d', marginBottom: 4 }}>INCIDENT {inc ? inc.code : '—'}</div>
-            <div style={{ height: 78, borderRadius: 8, background: 'linear-gradient(135deg,#cddbd6,#b3c9c2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#7c968e' }}>
+            <div style={{ position: 'relative', overflow: 'hidden', height: 78, borderRadius: 8, background: 'linear-gradient(135deg,#cddbd6,#b3c9c2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#7c968e' }}>
               📷
+              {d.inc_image_url && (
+                <img
+                  src={d.inc_image_url}
+                  alt="Matched incident photo"
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
             </div>
           </div>
         </div>

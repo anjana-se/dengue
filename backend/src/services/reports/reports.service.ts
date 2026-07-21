@@ -50,17 +50,29 @@ export interface CreateReportServiceInput extends CreateReportInput {
   isDroneImage?: boolean;
 }
 
-export async function resolveReportImageUrl(report: Report): Promise<Report> {
-  if (config.STORAGE_DRIVER === 's3' && report.image_key) {
-    const storage = getStorage();
+/**
+ * Mint a fresh, publicly-fetchable URL for a stored object key.
+ * In S3 mode this is a short-lived presigned GET URL; otherwise (local driver)
+ * the stored fallback URL is returned unchanged. Shared by the reports and
+ * incidents services so the STORAGE_DRIVER guard lives in exactly one place.
+ */
+export async function resolveImageUrl(
+  imageKey: string | null | undefined,
+  fallbackUrl: string,
+): Promise<string> {
+  if (config.STORAGE_DRIVER === 's3' && imageKey) {
     try {
-      const freshUrl = await storage.getUrl(report.image_key);
-      return { ...report, image_url: freshUrl };
+      return await getStorage().getUrl(imageKey);
     } catch (err: any) {
-      logger.warn('Failed to generate fresh signed URL for report', { reportId: report.id, error: err.message });
+      logger.warn('Failed to generate fresh signed URL', { imageKey, error: err.message });
     }
   }
-  return report;
+  return fallbackUrl;
+}
+
+export async function resolveReportImageUrl(report: Report): Promise<Report> {
+  const freshUrl = await resolveImageUrl(report.image_key, report.image_url);
+  return freshUrl === report.image_url ? report : { ...report, image_url: freshUrl };
 }
 
 export async function resolveReportsImageUrls(reports: Report[]): Promise<Report[]> {

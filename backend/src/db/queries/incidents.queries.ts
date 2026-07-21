@@ -225,9 +225,13 @@ export async function listDecisions(filters: { status?: string }) {
 
   const whereClause = conditions.length > 0 ? `WHERE dd.${conditions.join(' AND dd.')}` : '';
   const result = await query(
-    `SELECT dd.*, r.report_no AS new_report_no
+    `SELECT dd.*, r.report_no AS new_report_no,
+            r.image_url  AS new_image_url,  r.image_key  AS new_image_key,
+            pr.image_url AS inc_image_url, pr.image_key AS inc_image_key
      FROM duplicate_decisions dd
-     LEFT JOIN reports r ON r.id = dd.new_report_id
+     LEFT JOIN reports r    ON r.id  = dd.new_report_id
+     LEFT JOIN incidents i  ON i.id  = dd.matched_incident_id
+     LEFT JOIN reports pr   ON pr.id = i.primary_report_id
      ${whereClause}
      ORDER BY dd.created_at DESC`,
     params

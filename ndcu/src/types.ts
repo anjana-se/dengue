@@ -73,6 +73,8 @@ export interface Report {
   zone_name: string;
   incident_id?: string;
   created_at: string;
+  /** Fresh presigned (S3) or static (local) photo URL; null when no image. */
+  image_url?: string | null;
   /** Set on freshly streamed-in reports so the feed can animate them. */
   _new?: boolean;
 }
@@ -268,6 +270,10 @@ export interface Decision {
   time_diff_h: number;
   new_lat: number;
   new_lng: number;
+  /** Presigned/static photo of the new report being reviewed; null if none. */
+  new_image_url?: string | null;
+  /** Presigned/static photo of the matched incident's primary report; null if none. */
+  inc_image_url?: string | null;
 }
 
 /** A report row derived for an incident's detail view. */
@@ -297,6 +303,8 @@ export interface IncidentReport {
   needs_human_review?: boolean;
   guidance_text_si?: string;
   guidance_text_ta?: string;
+  /** Fresh presigned (S3) or static (local) photo URL; null when no image. */
+  image_url?: string | null;
 }
 
 export interface IncidentDetail {

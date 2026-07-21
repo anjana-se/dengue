@@ -1,5 +1,6 @@
 import * as incidentsQueries from '../../db/queries/incidents.queries';
 import * as reportsQueries from '../../db/queries/reports.queries';
+import { resolveImageUrl } from '../reports/reports.service';
 import * as zonesService from '../zones/zones.service';
 import { emitIncidentUpdated } from '../notifications/notifications.service';
 import { logger } from '../../shared/logger';
@@ -39,6 +40,8 @@ export async function getIncidentDetail(id: string) {
             location_name,
             notes,
             ai_analysis,
+            image_url,
+            image_key,
             (id = $2) AS primary
      FROM reports
      WHERE incident_id = $1
@@ -67,7 +70,7 @@ export async function getIncidentDetail(id: string) {
       resolved_at: inc.resolved_at,
       site_type: inc.site_type,
     },
-    reports: reportsRes.rows.map((r: any) => {
+    reports: await Promise.all(reportsRes.rows.map(async (r: any) => {
       const ai = r.ai_analysis && typeof r.ai_analysis === 'object' ? r.ai_analysis : {};
       return {
         report_id: r.report_id,
@@ -92,9 +95,11 @@ export async function getIncidentDetail(id: string) {
         notes: r.notes,
         larvae_visible: ai.larvae_visible ?? null,
         water_present: ai.water_present ?? null,
+        // Fresh presigned URL (S3) or stored URL (local); null if no image
+        image_url: r.image_url ? await resolveImageUrl(r.image_key, r.image_url) : null,
         primary: r.primary,
       };
-    }),
+    })),
     decisions: decisions.map((d: any) => ({
       decision_id: d.id,
       new_report_id: d.new_report_id,
@@ -209,7 +214,14 @@ export async function resolveDuplicateDecision(
 }
 
 export async function listDecisions(filters: { status?: string }) {
-  return incidentsQueries.listDecisions(filters);
+  const rows = await incidentsQueries.listDecisions(filters);
+  // Presign the new report's photo and the matched incident's primary-report photo
+  // (S3) or return the stored URL (local); null when the join found no image.
+  return Promise.all(rows.map(async (d: any) => ({
+    ...d,
+    new_image_url: d.new_image_url ? await resolveImageUrl(d.new_image_key, d.new_image_url) : null,
+    inc_image_url: d.inc_image_url ? await resolveImageUrl(d.inc_image_key, d.inc_image_url) : null,
+  })));
 }
 
 export async function updateIncidentStatus(id: string, status: string) {

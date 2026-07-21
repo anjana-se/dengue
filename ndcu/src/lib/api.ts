@@ -220,6 +220,7 @@ export const api = {
         zone_id: r.zone_id || '',
         zone_name: zoneMap.get(r.zone_id || '') || r.location_name || 'Unknown Zone',
         created_at: r.created_at || new Date().toISOString(),
+        image_url: r.image_url ?? null,
       };
     });
   },
@@ -427,6 +428,7 @@ export const api = {
       needs_human_review: !!r.needs_human_review,
       guidance_text_si: r.guidance_text_si || '',
       guidance_text_ta: r.guidance_text_ta || '',
+      image_url: r.image_url ?? null,
     }));
     const decisions: Decision[] = d.decisions || [];
     return { inc, reports, decisions };
@@ -452,6 +454,8 @@ export const api = {
       time_diff_h: d.time_diff_h,
       new_lat: d.new_lat,
       new_lng: d.new_lng,
+      new_image_url: d.new_image_url ?? null,
+      inc_image_url: d.inc_image_url ?? null,
     }));
   },
 

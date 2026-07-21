@@ -45,6 +45,7 @@ export default function ReportDrawer() {
     <Drawer title={reportRef(r.report_no, r.report_id)} onClose={() => setActiveReport(null)}>
       <div
         style={{
+          position: 'relative',
           height: 190,
           borderRadius: 12,
           background: 'linear-gradient(135deg,#cddbd6,#b3c9c2)',
@@ -54,9 +55,23 @@ export default function ReportDrawer() {
           fontSize: 44,
           color: '#7c968e',
           marginBottom: 16,
+          overflow: 'hidden',
         }}
       >
+        {/* Emoji sits underneath; a covering <img> hides it when a photo loads.
+            Presigned URLs expire (~15 min) — on error we hide the img so this
+            placeholder shows through again. */}
         {r.source_type === 'drone' ? '✈' : '📷'}
+        {r.image_url && (
+          <img
+            src={r.image_url}
+            alt="Report photo"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        )}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
