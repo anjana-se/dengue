@@ -9,6 +9,7 @@ export default function ReportDrawer() {
   const r = useStore((s) => s.activeReport);
   const orders = useStore((s) => s.orders);
   const setActiveReport = useStore((s) => s.setActiveReport);
+  const setLightbox = useStore((s) => s.setLightbox);
   const createWO = useStore((s) => s.createWO);
   const toast = useStore((s) => s.toast);
   const fetchData = useStore((s) => s.fetchData);
@@ -66,7 +67,8 @@ export default function ReportDrawer() {
           <img
             src={r.image_url}
             alt="Report photo"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onClick={() => setLightbox(r.image_url!)}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = 'none';
             }}

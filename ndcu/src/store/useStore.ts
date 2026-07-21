@@ -115,6 +115,8 @@ export interface AppState {
   reportSite: string;
   dupReviewOpen: boolean | null;
   iotAlertOpen: boolean | null;
+  /** URL of the image currently shown full-screen in the lightbox; null = closed. */
+  lightbox: string | null;
 
   // ── misc ──
   predAlertDismissed: boolean;
@@ -182,6 +184,7 @@ export interface AppState {
   setReportSite: (v: string) => void;
   setDupReviewOpen: (open: boolean) => void;
   setIotAlertOpen: (open: boolean) => void;
+  setLightbox: (url: string | null) => void;
   setActiveIncident: (id: string | null) => void;
   setIncReport: (r: IncidentReport | null) => void;
   setIncidentStatus: (id: string, status: IncidentStatus) => void;
@@ -273,6 +276,7 @@ export const useStore = create<AppState>((set, get) => ({
   reportSite: 'all',
   dupReviewOpen: null,
   iotAlertOpen: null,
+  lightbox: null,
 
   predAlertDismissed: readPredAlertDismissed(),
   toasts: [],
@@ -804,6 +808,7 @@ export const useStore = create<AppState>((set, get) => ({
   setReportSite: (reportSite) => set({ reportSite }),
   setDupReviewOpen: (dupReviewOpen) => set({ dupReviewOpen }),
   setIotAlertOpen: (iotAlertOpen) => set({ iotAlertOpen }),
+  setLightbox: (lightbox) => set({ lightbox }),
   setActiveIncident: (id) => set({ activeIncident: id, overrideDec: null, incReport: id ? get().incReport : null }),
   setIncReport: (r) => set({ incReport: r }),
 

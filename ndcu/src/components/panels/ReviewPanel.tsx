@@ -10,6 +10,7 @@ export default function ReviewPanel() {
   const dupReviewOpen = useStore((s) => s.dupReviewOpen);
   const setDupReviewOpen = useStore((s) => s.setDupReviewOpen);
   const updateDecision = useStore((s) => s.updateDecision);
+  const setLightbox = useStore((s) => s.setLightbox);
   const [reasons, setReasons] = useState<Record<string, string>>({});
 
   const pending = pendingDecisions(decisions);
@@ -30,7 +31,8 @@ export default function ReviewPanel() {
                 <img
                   src={d.new_image_url}
                   alt="New report photo"
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  onClick={() => setLightbox(d.new_image_url!)}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
               )}
@@ -48,7 +50,8 @@ export default function ReviewPanel() {
                 <img
                   src={d.inc_image_url}
                   alt="Matched incident photo"
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  onClick={() => setLightbox(d.inc_image_url!)}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
               )}

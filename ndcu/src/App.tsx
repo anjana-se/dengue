@@ -4,6 +4,7 @@ import Login from './components/Login';
 import AppShell from './components/AppShell';
 import Toasts from './components/Toasts';
 import DispatchModal from './components/modals/DispatchModal';
+import Lightbox from './components/common/Lightbox';
 
 export default function App() {
   const authed = useStore((s) => s.authed);
@@ -40,6 +41,7 @@ export default function App() {
     <>
       {authed ? <AppShell /> : <Login />}
       <Toasts />
+      <Lightbox />
       {dispatchOrder && <DispatchModal />}
     </>
   );

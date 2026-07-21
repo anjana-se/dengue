@@ -10,6 +10,7 @@ import type { Decision, IncidentReport, IncidentStatus } from '../../types';
 
 function ReportCard({ rp, idx }: { rp: IncidentReport; idx: number }) {
   const setIncReport = useStore((s) => s.setIncReport);
+  const setLightbox = useStore((s) => s.setLightbox);
   return (
     <div
       onClick={() => setIncReport(rp)}
@@ -22,7 +23,9 @@ function ReportCard({ rp, idx }: { rp: IncidentReport; idx: number }) {
           <img
             src={rp.image_url}
             alt="Report thumbnail"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            // Open the full-size lightbox instead of the report drawer.
+            onClick={(e) => { e.stopPropagation(); setLightbox(rp.image_url!); }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = 'none';
             }}

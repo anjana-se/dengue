@@ -10,6 +10,7 @@ export default function IncReportDrawer() {
   const incidents = useStore((s) => s.incidents);
   const setIncReport = useStore((s) => s.setIncReport);
   const setActiveIncident = useStore((s) => s.setActiveIncident);
+  const setLightbox = useStore((s) => s.setLightbox);
 
   if (!r) return null;
   const rk = RISK[r.risk_level];
@@ -47,7 +48,8 @@ export default function IncReportDrawer() {
           <img
             src={r.image_url}
             alt="Report photo"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onClick={() => setLightbox(r.image_url!)}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = 'none';
             }}
