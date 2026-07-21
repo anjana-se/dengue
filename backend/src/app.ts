@@ -39,6 +39,7 @@ export function createApp() {
   // ─── Core middleware ─────────────────────────────────────────────────────────
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'unsafe-none' },
   }));
   app.use(cors({ origin: corsOrigins, credentials: true }));
   app.use(morgan('combined', { stream: { write: (msg) => logger.http(msg.trim()) } }));

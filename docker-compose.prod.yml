@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.4-alpine
+    container_name: dengueguard-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dengueguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dengueguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dengueguard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.api
+    container_name: dengueguard-backend-api
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/dengueguard
+      - REDIS_URL=redis://redis:6379
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-super-secret-jwt-key-dengueguard-backend-321-long-enough-32-chars}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-super-secret-jwt-refresh-key-dengueguard-backend-321-long-enough-32-chars}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_CHAT_MODEL=${GEMINI_CHAT_MODEL}
+      - GEMINI_VISION_MODEL=${GEMINI_VISION_MODEL}
+      - GEMINI_TRANSLATION_MODEL=${GEMINI_TRANSLATION_MODEL}
+      - AI_ANALYSIS_CONFIDENCE_THRESHOLD=${AI_ANALYSIS_CONFIDENCE_THRESHOLD}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-local}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_REGION=${S3_REGION}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - SIGNED_URL_EXPIRES_SECONDS=${SIGNED_URL_EXPIRES_SECONDS}
+      - UPLOADS_DIR=/app/uploads
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
+      - AI_PROVIDER=${AI_PROVIDER:-nvidia}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_VISION_MODEL=${NVIDIA_VISION_MODEL}
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
+    volumes:
+      - shared_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "node dist/scripts/migrate.js && node dist/scripts/seed.js && node dist/src/index.js"
+    restart: always
+
+  backend-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: dengueguard-backend-worker
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/dengueguard
+      - REDIS_URL=redis://redis:6379
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-super-secret-jwt-key-dengueguard-backend-321-long-enough-32-chars}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-super-secret-jwt-refresh-key-dengueguard-backend-321-long-enough-32-chars}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_CHAT_MODEL=${GEMINI_CHAT_MODEL}
+      - GEMINI_VISION_MODEL=${GEMINI_VISION_MODEL}
+      - GEMINI_TRANSLATION_MODEL=${GEMINI_TRANSLATION_MODEL}
+      - AI_ANALYSIS_CONFIDENCE_THRESHOLD=${AI_ANALYSIS_CONFIDENCE_THRESHOLD}
+      - AI_PROVIDER=${AI_PROVIDER:-nvidia}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_VISION_MODEL=${NVIDIA_VISION_MODEL}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-local}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_REGION=${S3_REGION}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - SIGNED_URL_EXPIRES_SECONDS=${SIGNED_URL_EXPIRES_SECONDS}
+      - UPLOADS_DIR=/app/uploads
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
+    volumes:
+      - shared_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
+  cr-dashboard:
+    build:
+      context: ./cr
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+    container_name: dengueguard-cr-dashboard
+    ports:
+      - "80:80"
+    restart: always
+
+  ndcu-dashboard:
+    build:
+      context: ./ndcu
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+    container_name: dengueguard-ndcu-dashboard
+    ports:
+      - "8080:80"
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:
+  shared_uploads:

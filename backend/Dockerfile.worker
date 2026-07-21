@@ -6,8 +6,10 @@ RUN npm ci --frozen-lockfile
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY scripts ./scripts
 
 RUN npm run build
+RUN mkdir -p dist/src/db/migrations && cp src/db/migrations/*.sql dist/src/db/migrations/
 
 # ─── Production image ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS production
@@ -22,4 +24,4 @@ COPY --from=builder /app/dist ./dist
 RUN mkdir -p uploads
 
 # No EXPOSE — worker only consumes from Redis, no inbound HTTP
-CMD ["node", "dist/worker.js"]
+CMD ["node", "dist/src/worker.js"]
