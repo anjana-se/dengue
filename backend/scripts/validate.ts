@@ -623,6 +623,36 @@ async function run() {
     }
   }
 
+  // 28. POST /chat/message - Tool-calling path (assistant should query live data)
+  if (phiToken) {
+    try {
+      const res = await fetch(`${BASE_URL}/chat/message`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${phiToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: 'How many open work orders are there right now, and in which zones?'
+        })
+      });
+      const data: any = await res.json();
+      const reply: string = data?.data?.reply ?? '';
+      // Grounded, non-empty reply that isn't the generic error fallback.
+      const grounded =
+        reply.trim().length > 0 &&
+        !reply.includes('Could not reach') &&
+        !reply.includes('high traffic at the moment');
+      if (res.status === 200 && data.success && grounded) {
+        await log('Assistant Tool-Calling Reply (/chat/message → work orders)', true);
+      } else {
+        await log('Assistant Tool-Calling Reply (/chat/message → work orders)', false, data);
+      }
+    } catch (err: any) {
+      await log('Assistant Tool-Calling Reply (/chat/message → work orders)', false, err.message);
+    }
+  }
+
   console.log('\n🏁 API Validation complete.');
 }
 

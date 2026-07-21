@@ -1,6 +1,31 @@
 import { useRef } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { PRIMARY } from '../../theme';
 import { useStore } from '../../store/useStore';
+
+/**
+ * Compact Markdown element styling so assistant replies (bold, lists, links)
+ * sit tightly inside the chat bubble. Text color/size/line-height are inherited
+ * from the bubble container.
+ */
+const MD_COMPONENTS: Components = {
+  p: ({ children }) => <p style={{ margin: 0 }}>{children}</p>,
+  ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
+  li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+  strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+      {children}
+    </a>
+  ),
+  code: ({ children }) => (
+    <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.92em' }}>
+      {children}
+    </code>
+  ),
+};
 
 export default function Assistant() {
   const chat = useStore((s) => s.chat);
@@ -52,7 +77,15 @@ export default function Assistant() {
                   animation: 'dg-in .3s',
                 }}
               >
-                {m.content}
+                {m.role === 'user' ? (
+                  m.content
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
+                      {m.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
           ))}

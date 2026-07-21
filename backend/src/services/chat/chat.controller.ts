@@ -4,7 +4,7 @@ import type { SendMessageInput, ListSessionsQuery } from './chat.schemas';
 
 export async function handleSendMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await sendMessageService(req.body as SendMessageInput, req.user!.sub);
+    const result = await sendMessageService(req.body as SendMessageInput, req.user!.sub, req.user!.role);
     res.status(200).json({ success: true, data: result });
   } catch (err) { next(err); }
 }

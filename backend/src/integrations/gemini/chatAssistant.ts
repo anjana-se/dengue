@@ -1,75 +1,150 @@
+import { SchemaType, type Tool, type Content } from '@google/generative-ai';
 import { getModel } from './client';
 import { config } from '../../config/env';
 import { logger } from '../../shared/logger';
 import { buildChatSystemPrompt } from './promptTemplates/systemPrompts';
-import type { Language } from '../../types/domain.types';
+import type {
+  GenerateChatReplyParams,
+  ChatToolDef,
+} from '../chatAssistant';
 
 /**
  * integrations/gemini/chatAssistant.ts
  *
- * Handles the Gemini API call for the chat assistant.
- * Owns the actual API call and system-prompt assembly.
- * Does NOT know about sessions, context building, or DB — those live in chat.service.
- *
- * @param message       The user's current message
- * @param language      Detected or declared language for the response
- * @param contextJson   JSON string of live platform context (from contextBuilder.ts)
- * @param history       Prior conversation turns (for multi-turn context)
+ * Gemini implementation of the chat provider. Owns the Gemini-specific
+ * function-calling wire loop: declare tools → run → if the model emits
+ * functionCall(s), execute them via the injected `executeTool` callback →
+ * feed functionResponse(s) back → repeat (bounded). Knows nothing about
+ * sessions, the DB, auth, or audit — those live in services/chat.
  */
 
-export interface ChatTurn {
-  role: 'user' | 'model';
-  content: string;
+const MAX_TOOL_ITERATIONS = 3;
+
+/** Maps our draft-07 JSON-schema subset to Gemini's SchemaType-based schema. */
+function toGeminiSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  const typeMap: Record<string, SchemaType> = {
+    object: SchemaType.OBJECT,
+    string: SchemaType.STRING,
+    number: SchemaType.NUMBER,
+    integer: SchemaType.NUMBER,
+    boolean: SchemaType.BOOLEAN,
+    array: SchemaType.ARRAY,
+  };
+
+  const out: Record<string, unknown> = {
+    type: typeMap[String(schema.type)] ?? SchemaType.STRING,
+  };
+  if (schema.description) out.description = schema.description;
+  if (Array.isArray(schema.enum)) out.enum = schema.enum;
+  if (schema.type === 'object') {
+    const props = (schema.properties as Record<string, Record<string, unknown>>) ?? {};
+    const mapped: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(props)) {
+      mapped[key] = toGeminiSchema(val);
+    }
+    out.properties = mapped;
+    if (Array.isArray(schema.required) && schema.required.length) out.required = schema.required;
+  }
+  if (schema.type === 'array' && schema.items) {
+    out.items = toGeminiSchema(schema.items as Record<string, unknown>);
+  }
+  return out;
 }
 
-export async function generateChatReply(
-  message: string,
-  language: Language,
-  contextJson: string,
-  history: ChatTurn[] = [],
+function buildGeminiTools(defs: ChatToolDef[]): Tool[] {
+  return [
+    {
+      functionDeclarations: defs.map((d) => ({
+        name: d.name,
+        description: d.description,
+        parameters: toGeminiSchema(d.parameters),
+      })),
+    } as unknown as Tool,
+  ];
+}
+
+export async function generateGeminiChatReply(
+  params: GenerateChatReplyParams,
 ): Promise<string> {
+  const { message, language, contextJson, history = [], tools = [], executeTool } = params;
+
+  const model = getModel(config.GEMINI_CHAT_MODEL);
+  const systemInstruction = buildChatSystemPrompt(language, contextJson);
+  const geminiTools = tools.length ? buildGeminiTools(tools) : undefined;
+
+  // Seed the conversation: prior turns + current user message.
+  const contents: Content[] = [
+    ...history.map((turn) => ({ role: turn.role, parts: [{ text: turn.content }] })),
+    { role: 'user', parts: [{ text: message }] },
+  ];
+
   logger.debug('Calling Gemini chat assistant', {
     language,
     historyLength: history.length,
-    messageLength: message.length,
+    toolCount: tools.length,
   });
 
-  const model = getModel(config.GEMINI_CHAT_MODEL);
-  const systemPrompt = buildChatSystemPrompt(language, contextJson);
-
-  // Build multi-turn content array
-  // Gemini expects alternating user/model turns; inject history first
-  const contents = [
-    // Prior turns
-    ...history.map((turn) => ({
-      role: turn.role,
-      parts: [{ text: turn.content }],
-    })),
-    // Current user message
-    {
-      role: 'user' as const,
-      parts: [{ text: message }],
-    },
-  ];
-
   try {
-    const response = await model.generateContent({
-      systemInstruction: systemPrompt,
-      contents,
-      generationConfig: {
-        temperature: 0.4,       // Slightly creative but grounded
-        maxOutputTokens: 512,   // Keep replies concise
-      },
-    });
+    // Bounded tool-calling loop. +1 to allow a final text turn after the last
+    // permitted tool round.
+    for (let i = 0; i <= MAX_TOOL_ITERATIONS; i++) {
+      const result = await model.generateContent({
+        systemInstruction,
+        contents,
+        tools: geminiTools,
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 1024,
+        },
+      });
 
-    const reply = response.response.text().trim();
-    logger.debug('Chat reply generated', { replyLength: reply.length });
-    return reply;
-  } catch (err: any) {
-    logger.warn('AI chat assistant call failed, returning fallback response', { error: err.message });
-    if (err?.message?.includes('429') || err?.status === 429) {
+      const response = result.response;
+      const calls = executeTool ? (response.functionCalls() ?? []) : [];
+
+      if (calls.length === 0) {
+        return response.text().trim();
+      }
+
+      // On the last iteration, stop asking for tools and force a text answer.
+      if (i === MAX_TOOL_ITERATIONS) {
+        logger.warn('Chat assistant hit tool-iteration cap; forcing text reply');
+        const finalModel = getModel(config.GEMINI_CHAT_MODEL);
+        const finalResult = await finalModel.generateContent({
+          systemInstruction,
+          contents,
+          generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+        });
+        return finalResult.response.text().trim();
+      }
+
+      // Append the model's tool-call turn, then execute each call and append the
+      // results as a single `function` turn.
+      const modelContent = response.candidates?.[0]?.content;
+      if (modelContent) contents.push(modelContent);
+
+      const responseParts = [];
+      for (const call of calls) {
+        let output: unknown;
+        try {
+          output = await executeTool!(call.name, (call.args ?? {}) as Record<string, unknown>);
+        } catch (err) {
+          output = { error: (err as Error).message };
+        }
+        responseParts.push({
+          functionResponse: { name: call.name, response: { result: output } },
+        });
+      }
+      contents.push({ role: 'function', parts: responseParts });
+    }
+
+    // Unreachable in practice (the i === MAX_TOOL_ITERATIONS branch returns).
+    return '';
+  } catch (err: unknown) {
+    const e = err as { message?: string; status?: number };
+    logger.warn('AI chat assistant call failed, returning fallback response', { error: e?.message });
+    if (e?.message?.includes('429') || e?.status === 429) {
       return "I'm experiencing high traffic at the moment. Please try again in a few seconds. In the meantime, you can review high-risk zones and open work orders directly on the dashboard.";
     }
-    return "I am DengueGuard Assistant. Currently, live platform telemetry and risk indicators are active. How can I assist you with vector control actions?";
+    return 'I am DengueGuard Assistant. Currently, live platform telemetry and risk indicators are active. How can I assist you with vector control actions?';
   }
 }

@@ -7,8 +7,10 @@ import {
   touchSession,
   updateSessionTitle,
 } from '../../db/queries/chat.queries';
-import { generateChatReply } from '../../integrations/gemini/chatAssistant';
+import { generateChatReply, type ToolExecutor } from '../../integrations/chatAssistant';
 import { buildChatContext } from './contextBuilder';
+import { chatToolDefs, runChatTool } from './tools';
+import { createAuditEntry } from '../../db/queries/auditLog.queries';
 import { parsePaginationParams, buildPaginatedResult } from '../../shared/pagination.util';
 import { NotFoundError } from '../../shared/httpErrors';
 import { logger } from '../../shared/logger';
@@ -20,6 +22,8 @@ import type { SendMessageInput, ListSessionsQuery } from './chat.schemas';
  *
  * Handles session management + the message send/reply loop.
  * History is limited to the last 20 turns to keep token count bounded.
+ * Owns tool execution: the model requests a tool, we run it here (auth-scoped,
+ * audit-logged), and hand the result back to the provider.
  */
 
 const MAX_HISTORY_TURNS = 20;
@@ -27,6 +31,7 @@ const MAX_HISTORY_TURNS = 20;
 export async function sendMessageService(
   input: SendMessageInput,
   userId: string,
+  role: string,
 ) {
   const language = (input.language ?? 'en') as Language;
 
@@ -50,11 +55,39 @@ export async function sendMessageService(
   // ── 3. Build platform context ────────────────────────────────────────────
   const contextJson = await buildChatContext();
 
-  // ── 4. Call Gemini ───────────────────────────────────────────────────────
-  logger.debug('Sending message to Gemini chat', { sessionId, userId, language });
-  const reply = await generateChatReply(input.message, language, contextJson, historyTurns);
+  // ── 4. Tool executor (auth-scoped, audit-logged) ─────────────────────────
+  // Resolves rather than rejects so the model can recover from a tool error.
+  const executeTool: ToolExecutor = async (name, args) => {
+    let ok = true;
+    try {
+      return await runChatTool(name, args, { userId, role });
+    } catch (err) {
+      ok = false;
+      logger.warn('Chat tool execution failed', { name, error: (err as Error).message });
+      return { error: (err as Error).message };
+    } finally {
+      // Regulated-domain audit trail: record every tool invocation.
+      createAuditEntry({
+        user_id: userId,
+        action: `chat.tool.${name}`,
+        entity_type: 'chat_tool',
+        new_values: { args, ok },
+      }).catch((e) => logger.warn('Failed to write chat tool audit entry', { error: (e as Error).message }));
+    }
+  };
 
-  // ── 5. Persist both turns ────────────────────────────────────────────────
+  // ── 5. Generate reply (provider owns the tool-calling loop) ──────────────
+  logger.debug('Sending message to chat assistant', { sessionId, userId, language });
+  const reply = await generateChatReply({
+    message: input.message,
+    language,
+    contextJson,
+    history: historyTurns,
+    tools: chatToolDefs,
+    executeTool,
+  });
+
+  // ── 6. Persist both turns ────────────────────────────────────────────────
   await insertChatMessage(sessionId, 'user', input.message);
   await insertChatMessage(sessionId, 'model', reply);
   await touchSession(sessionId);
