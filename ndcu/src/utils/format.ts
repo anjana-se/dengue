@@ -45,6 +45,15 @@ export function datef(iso: string): string {
   });
 }
 
+/** "RPT-000042" from a sequential report number.
+ *  Falls back to the raw id for mock/legacy data lacking report_no. */
+export function reportRef(no?: number | string | null, fallbackId?: string): string {
+  if (no == null || no === '') return fallbackId ?? '—';
+  const n = Number(no);
+  if (!Number.isFinite(n)) return fallbackId ?? String(no);
+  return 'RPT-' + String(n).padStart(6, '0');
+}
+
 /**
  * Human-readable labels for the AI `site_type` enum. The stored/queried value
  * stays the raw enum (e.g. "blocked_drain"); this is display-only.

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PRIMARY } from '../../theme';
 import { pendingDecisions, useStore } from '../../store/useStore';
+import { reportRef } from '../../utils/format';
 import type { Decision } from '../../types';
 
 export default function ReviewPanel() {
@@ -22,7 +23,7 @@ export default function ReviewPanel() {
       <div key={d.decision_id} style={{ border: '1px solid #eef1f0', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
         <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a29d', marginBottom: 4 }}>NEW REPORT {d.new_report_id}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a29d', marginBottom: 4 }}>NEW REPORT {reportRef(d.new_report_no, d.new_report_id)}</div>
             <div style={{ height: 78, borderRadius: 8, background: 'linear-gradient(135deg,#dbe7e3,#c4d6d0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#5c7a72' }}>
               📷
             </div>

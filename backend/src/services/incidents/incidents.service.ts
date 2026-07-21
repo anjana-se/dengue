@@ -22,6 +22,7 @@ export async function getIncidentDetail(id: string) {
   // model output rather than being derived from risk level on the client).
   const reportsRes = await pool.query(
     `SELECT id AS report_id,
+            report_no,
             source_type,
             created_at AS submitted_at,
             risk_level,
@@ -64,6 +65,7 @@ export async function getIncidentDetail(id: string) {
       const ai = r.ai_analysis && typeof r.ai_analysis === 'object' ? r.ai_analysis : {};
       return {
         report_id: r.report_id,
+        report_no: r.report_no,
         source_type: r.source_type,
         submitted_at: r.submitted_at,
         risk_level: r.risk_level,
@@ -81,6 +83,7 @@ export async function getIncidentDetail(id: string) {
     decisions: decisions.map((d: any) => ({
       decision_id: d.id,
       new_report_id: d.new_report_id,
+      new_report_no: d.new_report_no,
       matched_incident_id: d.matched_incident_id,
       confidence: d.confidence,
       decision: d.decision,

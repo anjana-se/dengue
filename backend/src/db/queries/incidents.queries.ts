@@ -134,9 +134,11 @@ export async function createDecision(input: CreateDecisionInput) {
 
 export async function getDuplicateDecisions(incidentId: string) {
   const result = await query(
-    `SELECT * FROM duplicate_decisions
-     WHERE matched_incident_id = $1
-     ORDER BY created_at DESC`,
+    `SELECT dd.*, r.report_no AS new_report_no
+     FROM duplicate_decisions dd
+     LEFT JOIN reports r ON r.id = dd.new_report_id
+     WHERE dd.matched_incident_id = $1
+     ORDER BY dd.created_at DESC`,
     [incidentId]
   );
   return result.rows;
@@ -221,9 +223,13 @@ export async function listDecisions(filters: { status?: string }) {
     params.push(status);
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const whereClause = conditions.length > 0 ? `WHERE dd.${conditions.join(' AND dd.')}` : '';
   const result = await query(
-    `SELECT * FROM duplicate_decisions ${whereClause} ORDER BY created_at DESC`,
+    `SELECT dd.*, r.report_no AS new_report_no
+     FROM duplicate_decisions dd
+     LEFT JOIN reports r ON r.id = dd.new_report_id
+     ${whereClause}
+     ORDER BY dd.created_at DESC`,
     params
   );
   return result.rows;

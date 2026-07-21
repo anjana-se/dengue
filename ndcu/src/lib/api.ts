@@ -193,6 +193,7 @@ export const api = {
       const statusRaw = r.status || '';
       return {
         report_id: r.id,
+        report_no: r.report_no,
         source_type: (r.source_type || 'community') as SourceType,
         lat: r.latitude != null ? Number(r.latitude) : 0,
         lng: r.longitude != null ? Number(r.longitude) : 0,
@@ -397,6 +398,7 @@ export const api = {
     // (no risk-level derivation), and confidence is scaled to a 0-100 percentage.
     const reports: IncidentReport[] = (d.reports || []).map((r: any) => ({
       report_id: r.report_id,
+      report_no: r.report_no,
       role: r.source_type === 'drone' ? 'Drone operator' : 'Community reporter',
       source_type: (r.source_type || 'community') as SourceType,
       submitted_at: r.submitted_at || new Date().toISOString(),
@@ -422,6 +424,7 @@ export const api = {
     return raw.map((d: any) => ({
       decision_id: d.id,
       new_report_id: d.new_report_id,
+      new_report_no: d.new_report_no,
       matched_incident_id: d.matched_incident_id,
       confidence: d.confidence,
       decision: d.decision,

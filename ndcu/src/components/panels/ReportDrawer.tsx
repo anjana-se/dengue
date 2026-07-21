@@ -1,5 +1,5 @@
 import { PRIMARY, RISK } from '../../theme';
-import { timf, siteTypeLabel } from '../../utils/format';
+import { timf, siteTypeLabel, reportRef } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
@@ -39,7 +39,7 @@ export default function ReportDrawer() {
   };
 
   return (
-    <Drawer title={'Report ' + r.report_id} onClose={() => setActiveReport(null)}>
+    <Drawer title={reportRef(r.report_no, r.report_id)} onClose={() => setActiveReport(null)}>
       <div
         style={{
           height: 190,

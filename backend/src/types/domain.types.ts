@@ -54,6 +54,7 @@ export interface DroneMission {
 
 export interface Report {
   id: string;
+  report_no: number;   // human-friendly sequential display number (display-only; UUID id stays canonical)
   source_type: SourceType;
   reporter_id: string | null;
   zone_id: string | null;

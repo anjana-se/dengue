@@ -38,6 +38,7 @@ export async function handleCreateReport(
       success: true,
       data: {
         report_id: report.id,
+        report_no: report.report_no,
         status: report.status,
         message: 'Report received. AI analysis is in progress.',
       },

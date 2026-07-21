@@ -50,6 +50,7 @@ export interface AiAnalysis {
 
 export interface Report {
   report_id: string;
+  report_no?: number;
   source_type: SourceType;
   lat: number;
   lng: number;
@@ -248,6 +249,7 @@ export interface Incident {
 export interface Decision {
   decision_id: string;
   new_report_id: string;
+  new_report_no?: number;
   matched_incident_id: string | null;
   confidence: number;
   decision: DecisionType;
@@ -266,6 +268,7 @@ export interface Decision {
 /** A report row derived for an incident's detail view. */
 export interface IncidentReport {
   report_id: string;
+  report_no?: number;
   role: string;
   source_type: SourceType;
   submitted_at: string;

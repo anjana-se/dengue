@@ -1,5 +1,5 @@
 import { PRIMARY, RISK } from '../../theme';
-import { datef, siteTypeLabel } from '../../utils/format';
+import { datef, siteTypeLabel, reportRef } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
@@ -23,7 +23,7 @@ export default function IncReportDrawer() {
   );
 
   return (
-    <Drawer title={'Report ' + r.report_id} onClose={() => setIncReport(null)}>
+    <Drawer title={reportRef(r.report_no, r.report_id)} onClose={() => setIncReport(null)}>
       <div
         style={{
           height: 180,
@@ -104,7 +104,7 @@ export default function IncReportDrawer() {
         <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>
           Report details
         </div>
-        {row('Report ID', r.report_id)}
+        {row('Report ID', reportRef(r.report_no, r.report_id))}
         {row('Source', r.source_type === 'drone' ? 'Drone capture' : 'Community report')}
         {row('Site type', siteTypeLabel(r.site_type))}
         {row('Larvae visible', r.larvae_visible === 'yes' ? 'Yes' : r.larvae_visible === 'no' ? 'No' : 'Unclear')}
