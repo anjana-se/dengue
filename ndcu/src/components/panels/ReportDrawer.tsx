@@ -1,5 +1,5 @@
 import { PRIMARY, RISK } from '../../theme';
-import { timf, siteTypeLabel, reportRef } from '../../utils/format';
+import { timf, siteTypeLabel, reportRef, remediationLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
@@ -20,8 +20,11 @@ export default function ReportDrawer() {
 
   const facts: [string, string][] = [
     ['Site type', siteTypeLabel(r.site_type)],
+    ['Recommended action', remediationLabel(r.remediation_action)],
     ['Water present', r.ai_analysis.water_present ? 'Yes' : 'No'],
     ['Larvae visible', r.larvae_visible === 'yes' ? 'Yes ⚠' : r.larvae_visible === 'no' ? 'No' : 'Unclear'],
+    ['Dengue risk', r.ai_analysis.is_dengue_risk ? 'Yes' : 'No'],
+    ['Needs review', r.needs_human_review ? 'Yes ⚠' : 'No'],
     ['Source', r.source_type],
   ];
 
@@ -95,6 +98,33 @@ export default function ReportDrawer() {
         ))}
       </div>
 
+      {r.ai_analysis.breeding_indicators && r.ai_analysis.breeding_indicators.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#94a29d',
+              textTransform: 'uppercase',
+              letterSpacing: '.06em',
+              marginBottom: 6,
+            }}
+          >
+            Breeding indicators
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {r.ai_analysis.breeding_indicators.map((ind, i) => (
+              <span
+                key={i}
+                style={{ fontSize: 11.5, background: '#eef4f2', color: '#334b45', padding: '4px 9px', borderRadius: 12 }}
+              >
+                {ind}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           background: rk.bg,
@@ -119,6 +149,36 @@ export default function ReportDrawer() {
         <div style={{ fontSize: 13, color: '#334b45', lineHeight: 1.5 }}>{r.guidance_text}</div>
       </div>
 
+      {(r.ai_analysis.guidance_text_si || r.ai_analysis.guidance_text_ta) && (
+        <details style={{ marginBottom: 14 }}>
+          <summary
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#94a29d',
+              textTransform: 'uppercase',
+              letterSpacing: '.06em',
+              cursor: 'pointer',
+              marginBottom: 6,
+            }}
+          >
+            Guidance translations
+          </summary>
+          {r.ai_analysis.guidance_text_si && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a29d', marginBottom: 2 }}>සිංහල (Sinhala)</div>
+              <div style={{ fontSize: 12.5, color: '#334b45', lineHeight: 1.5 }}>{r.ai_analysis.guidance_text_si}</div>
+            </div>
+          )}
+          {r.ai_analysis.guidance_text_ta && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a29d', marginBottom: 2 }}>தமிழ் (Tamil)</div>
+              <div style={{ fontSize: 12.5, color: '#334b45', lineHeight: 1.5 }}>{r.ai_analysis.guidance_text_ta}</div>
+            </div>
+          )}
+        </details>
+      )}
+
       <div style={{ marginBottom: 20 }}>
         <div
           style={{
@@ -134,6 +194,24 @@ export default function ReportDrawer() {
         </div>
         <div style={{ fontSize: 12.5, color: '#6b7c77', lineHeight: 1.55 }}>{r.ai_analysis.reasoning}</div>
       </div>
+
+      {r.ai_analysis.additional_notes && (
+        <div style={{ marginBottom: 20 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#94a29d',
+              textTransform: 'uppercase',
+              letterSpacing: '.06em',
+              marginBottom: 5,
+            }}
+          >
+            Additional notes
+          </div>
+          <div style={{ fontSize: 12.5, color: '#6b7c77', lineHeight: 1.55 }}>{r.ai_analysis.additional_notes}</div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 10 }}>
         {hasWO ? (

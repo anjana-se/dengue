@@ -211,6 +211,11 @@ export const api = {
           site_type: r.site_type || 'Container',
           larvae_visible: normalizeLarvae(ai.larvae_visible),
           reasoning: ai.reasoning || '',
+          breeding_indicators: r.breeding_indicators || ai.breeding_indicators || [],
+          is_dengue_risk: !!ai.is_dengue_risk,
+          additional_notes: ai.additional_notes || '',
+          guidance_text_si: r.guidance_text_si || ai.guidance_text_si || '',
+          guidance_text_ta: r.guidance_text_ta || ai.guidance_text_ta || '',
         },
         zone_id: r.zone_id || '',
         zone_name: zoneMap.get(r.zone_id || '') || r.location_name || 'Unknown Zone',
@@ -413,6 +418,15 @@ export const api = {
       larvae_visible: normalizeLarvae(r.larvae_visible),
       water_present: !!r.water_present,
       notes: r.notes || '',
+      remediation_action: r.remediation_action || '',
+      guidance_text: r.guidance_text || '',
+      reasoning: r.reasoning || '',
+      breeding_indicators: r.breeding_indicators || [],
+      is_dengue_risk: !!r.is_dengue_risk,
+      additional_notes: r.additional_notes || '',
+      needs_human_review: !!r.needs_human_review,
+      guidance_text_si: r.guidance_text_si || '',
+      guidance_text_ta: r.guidance_text_ta || '',
     }));
     const decisions: Decision[] = d.decisions || [];
     return { inc, reports, decisions };

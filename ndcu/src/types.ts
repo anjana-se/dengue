@@ -46,6 +46,11 @@ export interface AiAnalysis {
   site_type: string;
   larvae_visible: LarvaeVisible;
   reasoning: string;
+  breeding_indicators?: string[];
+  is_dengue_risk?: boolean;
+  additional_notes?: string;
+  guidance_text_si?: string;
+  guidance_text_ta?: string;
 }
 
 export interface Report {
@@ -283,6 +288,15 @@ export interface IncidentReport {
   larvae_visible: LarvaeVisible;
   water_present: boolean;
   notes: string;
+  remediation_action?: string;
+  guidance_text?: string;
+  reasoning?: string;
+  breeding_indicators?: string[];
+  is_dengue_risk?: boolean;
+  additional_notes?: string;
+  needs_human_review?: boolean;
+  guidance_text_si?: string;
+  guidance_text_ta?: string;
 }
 
 export interface IncidentDetail {

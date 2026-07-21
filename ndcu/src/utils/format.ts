@@ -90,3 +90,29 @@ export function siteTypeLabel(value: string | null | undefined): string {
     .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
     .join(' ');
 }
+
+/** Human-readable labels for the AI `remediation_action` enum (display-only). */
+const REMEDIATION_LABELS: Record<string, string> = {
+  drain_water: 'Drain Water',
+  remove_container: 'Remove Container',
+  apply_larvicide: 'Apply Larvicide',
+  cover_container: 'Cover Container',
+  clear_drain: 'Clear Drain',
+  spray_insecticide: 'Spray Insecticide',
+  public_notice: 'Public Notice',
+  no_action_needed: 'No Action Needed',
+  other: 'Other',
+};
+
+/** "clear_drain" -> "Clear Drain". Falls back to Title-Case for any unknown/legacy value. */
+export function remediationLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  const mapped = REMEDIATION_LABELS[value.toLowerCase()];
+  if (mapped) return mapped;
+  return value
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}

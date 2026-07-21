@@ -1,5 +1,5 @@
 import { PRIMARY, RISK } from '../../theme';
-import { datef, siteTypeLabel, reportRef } from '../../utils/format';
+import { datef, siteTypeLabel, reportRef, remediationLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
 import Badge from '../common/Badge';
 import Drawer from '../common/Drawer';
@@ -100,6 +100,67 @@ export default function IncReportDrawer() {
         </div>
       </div>
 
+      {r.guidance_text && (
+        <div
+          style={{
+            background: rk.bg,
+            borderLeft: '3px solid ' + rk.c,
+            borderRadius: 8,
+            padding: '11px 13px',
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 700, color: rk.c, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>
+            Field Guidance
+          </div>
+          <div style={{ fontSize: 12.5, color: '#334b45', lineHeight: 1.5 }}>{r.guidance_text}</div>
+        </div>
+      )}
+
+      {(r.guidance_text_si || r.guidance_text_ta) && (
+        <details style={{ marginBottom: 14 }}>
+          <summary style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.05em', cursor: 'pointer' }}>
+            Guidance translations
+          </summary>
+          {r.guidance_text_si && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a29d', marginBottom: 2 }}>සිංහල (Sinhala)</div>
+              <div style={{ fontSize: 12.5, color: '#334b45', lineHeight: 1.5 }}>{r.guidance_text_si}</div>
+            </div>
+          )}
+          {r.guidance_text_ta && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a29d', marginBottom: 2 }}>தமிழ் (Tamil)</div>
+              <div style={{ fontSize: 12.5, color: '#334b45', lineHeight: 1.5 }}>{r.guidance_text_ta}</div>
+            </div>
+          )}
+        </details>
+      )}
+
+      {r.breeding_indicators && r.breeding_indicators.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>
+            Breeding indicators
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {r.breeding_indicators.map((ind, i) => (
+              <span key={i} style={{ fontSize: 11.5, background: '#eef4f2', color: '#334b45', padding: '4px 9px', borderRadius: 12 }}>
+                {ind}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.reasoning && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 }}>
+            Reasoning
+          </div>
+          <div style={{ fontSize: 12.5, color: '#6b7c77', lineHeight: 1.55 }}>{r.reasoning}</div>
+        </div>
+      )}
+
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>
           Report details
@@ -107,8 +168,11 @@ export default function IncReportDrawer() {
         {row('Report ID', reportRef(r.report_no, r.report_id))}
         {row('Source', r.source_type === 'drone' ? 'Drone capture' : 'Community report')}
         {row('Site type', siteTypeLabel(r.site_type))}
+        {row('Recommended action', remediationLabel(r.remediation_action))}
         {row('Larvae visible', r.larvae_visible === 'yes' ? 'Yes' : r.larvae_visible === 'no' ? 'No' : 'Unclear')}
         {row('Standing water', r.water_present ? 'Yes' : 'No')}
+        {row('Dengue risk', r.is_dengue_risk ? 'Yes' : 'No')}
+        {row('Needs review', r.needs_human_review ? 'Yes' : 'No')}
         {row('Submitted', datef(r.submitted_at))}
         {row('Location', r.lat.toFixed(4) + ', ' + r.lng.toFixed(4))}
       </div>
@@ -132,6 +196,15 @@ export default function IncReportDrawer() {
           >
             “{r.notes}”
           </div>
+        </div>
+      )}
+
+      {r.additional_notes && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a29d', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 }}>
+            Additional notes
+          </div>
+          <div style={{ fontSize: 12.5, color: '#6b7c77', lineHeight: 1.55 }}>{r.additional_notes}</div>
         </div>
       )}
     </Drawer>
