@@ -193,6 +193,12 @@ export interface AppState {
   setMergeSource: (id: string | null) => void;
   setMergeQuery: (q: string) => void;
   mergeIncidents: (srcId: string, tgtId: string) => void;
+
+  // ── socket push updates (incremental — applied per server event, no full refetch) ──
+  upsertReport: (r: Report) => void;
+  patchZone: (p: { zone_id: string; risk_level: string; risk_score: number; active_report_count: number }) => void;
+  upsertWorkOrder: (raw: any) => void;
+  upsertIncident: (i: Incident) => void;
 }
 
 /** Map backend raw work order row + existing reports into WorkOrder frontend shape */
@@ -459,6 +465,50 @@ export const useStore = create<AppState>((set, get) => ({
       get().toast(err.message || 'Failed to load staff users', 'error');
     }
   },
+
+  // ── Socket push updates ──────────────────────────────────────────────────
+  // Apply a single server event to the store without re-fetching every slice.
+  // Mirrors the demo-tick idioms: replace-by-id if present, else prepend.
+
+  upsertReport: (r) => set((s) => {
+    const zoneName = s.zones.find((z) => z.zone_id === r.zone_id)?.name;
+    const report: Report = { ...r, zone_name: zoneName || r.zone_name, _new: true };
+    const exists = s.reports.some((x) => x.report_id === report.report_id);
+    const reports = exists
+      ? s.reports.map((x) => (x.report_id === report.report_id ? report : x))
+      : [report, ...s.reports].slice(0, 100);
+    return { reports };
+  }),
+
+  patchZone: (p) => set((s) => ({
+    zones: s.zones.map((z) => z.zone_id === p.zone_id
+      ? {
+          ...z,
+          risk_level: p.risk_level as Zone['risk_level'],
+          risk_score: p.risk_score,
+          active_report_count: p.active_report_count,
+        }
+      : z),
+  })),
+
+  upsertWorkOrder: (raw) => set((s) => {
+    const reportMap = new Map(s.reports.map((r) => [r.report_id, r]));
+    const zoneMap = new Map(s.zones.map((z) => [z.zone_id, z.name]));
+    const wo = mapWorkOrder(raw, reportMap, zoneMap);
+    const exists = s.orders.some((x) => x.wo_id === wo.wo_id);
+    const orders = exists
+      ? s.orders.map((x) => (x.wo_id === wo.wo_id ? wo : x))
+      : [wo, ...s.orders];
+    return { orders };
+  }),
+
+  upsertIncident: (i) => set((s) => {
+    const exists = s.incidents.some((x) => x.incident_id === i.incident_id);
+    const incidents = exists
+      ? s.incidents.map((x) => (x.incident_id === i.incident_id ? i : x))
+      : [i, ...s.incidents];
+    return { incidents };
+  }),
 
   setView: (v) => {
     const allowed = allowedViews(get().role);

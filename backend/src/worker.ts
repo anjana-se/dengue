@@ -3,6 +3,7 @@ import { logger } from './shared/logger';
 import { pool } from './db/client';
 import { startWorker, stopWorker } from './ai/queue/consumer';
 import { startZoneRiskRecomputeJob, stopZoneRiskRecomputeJob } from './jobs/zoneRiskRecompute.job';
+import { initSocketEmitter } from './services/notifications/socket.server';
 
 /**
  * src/worker.ts — BullMQ worker process entry point.
@@ -11,6 +12,10 @@ import { startZoneRiskRecomputeJob, stopZoneRiskRecomputeJob } from './jobs/zone
 
 async function bootstrap() {
   logger.info('🔧 DengueGuard Worker starting...');
+
+  // Redis-backed emitter so worker-produced socket events reach connected clients
+  // (the worker has no HTTP server, so it can't run a Socket.IO server directly).
+  initSocketEmitter();
 
   // Start the AI analysis worker
   startWorker();

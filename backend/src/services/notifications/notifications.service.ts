@@ -8,9 +8,10 @@ import { SOCKET_EVENTS, SOCKET_ROOMS } from '../../config/constants';
  * Every other service calls into these functions rather than touching
  * socket.server.ts directly, keeping the event contract in one place.
  *
- * Uses a lazy getIO() import so the module compiles even if Socket.IO
- * hasn't been initialised yet (e.g. in the worker process which doesn't
- * start the HTTP server).
+ * Uses a lazy getBroadcaster() import so the module compiles even if Socket.IO
+ * hasn't been initialised yet. The broadcaster is the real io server in the API
+ * process, or a Redis emitter in the worker process — either way, emits reach
+ * connected clients through the shared Redis adapter.
  */
 
 export interface ReportAnalysedPayload {
@@ -40,17 +41,17 @@ export interface ZoneUpdatedPayload {
   active_report_count: number;
 }
 
-function tryGetIO() {
+function tryGetBroadcaster() {
   try {
-    const { getOptionalIO } = require('./socket.server') as typeof import('./socket.server');
-    return getOptionalIO();
+    const { getBroadcaster } = require('./socket.server') as typeof import('./socket.server');
+    return getBroadcaster();
   } catch {
     return null;
   }
 }
 
 export function emitReportAnalysed(payload: ReportAnalysedPayload): void {
-  const io = tryGetIO();
+  const io = tryGetBroadcaster();
   if (io) {
     // Broadcast to all NDCU admins and to the zone's PHI officers
     io.to(SOCKET_ROOMS.NDCU_ADMINS).emit(SOCKET_EVENTS.REPORT_ANALYSED, payload);
@@ -63,7 +64,7 @@ export function emitReportAnalysed(payload: ReportAnalysedPayload): void {
 }
 
 export function emitWorkOrderCreated(payload: WorkOrderCreatedPayload): void {
-  const io = tryGetIO();
+  const io = tryGetBroadcaster();
   if (io) {
     io.to(SOCKET_ROOMS.NDCU_ADMINS).emit(SOCKET_EVENTS.WORKORDER_CREATED, payload);
     logger.info('[Socket] workorder:created emitted', { workorderId: payload.workorder_id });
@@ -73,7 +74,7 @@ export function emitWorkOrderCreated(payload: WorkOrderCreatedPayload): void {
 }
 
 export function emitWorkOrderAssigned(payload: WorkOrderAssignedPayload): void {
-  const io = tryGetIO();
+  const io = tryGetBroadcaster();
   if (io) {
     const phiRoom = SOCKET_ROOMS.phiRoom(payload.assigned_to);
     io.to(phiRoom).emit(SOCKET_EVENTS.WORKORDER_ASSIGNED, payload);
@@ -85,7 +86,7 @@ export function emitWorkOrderAssigned(payload: WorkOrderAssignedPayload): void {
 }
 
 export function emitZoneUpdated(payload: ZoneUpdatedPayload): void {
-  const io = tryGetIO();
+  const io = tryGetBroadcaster();
   if (io) {
     // Broadcast zone updates to all privileged users
     io.to(SOCKET_ROOMS.NDCU_ADMINS).emit(SOCKET_EVENTS.ZONE_UPDATED, payload);
@@ -96,7 +97,7 @@ export function emitZoneUpdated(payload: ZoneUpdatedPayload): void {
 }
 
 export function emitIncidentUpdated(payload: { incident_id: string }): void {
-  const io = tryGetIO();
+  const io = tryGetBroadcaster();
   if (io) {
     io.emit('incident:updated', payload);
     logger.debug('[Socket] incident:updated emitted', payload);

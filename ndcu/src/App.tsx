@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from './store/useStore';
+import { connectSocket, disconnectSocket } from './lib/socket';
 import Login from './components/Login';
 import AppShell from './components/AppShell';
 import Toasts from './components/Toasts';
@@ -16,11 +17,15 @@ export default function App() {
     useStore.getState().checkSavedAuth();
   }, []);
 
-  // Poll for live updates every 9s
+  // Live updates via Socket.IO (replaces the old 9s poll). Connect while
+  // authenticated and NOT in demo mode; demo mode stays fully client-side.
+  // The initial data load is done by login()/checkSavedAuth(); the socket then
+  // pushes incremental changes and reconciles with one fetch on reconnect.
   useEffect(() => {
-    const id = window.setInterval(() => useStore.getState().liveTick(), 9000);
-    return () => clearInterval(id);
-  }, []);
+    if (!authed || demoMode) return;
+    connectSocket();
+    return () => disconnectSocket();
+  }, [authed, demoMode]);
 
   // Demo mode: simulate streaming reports, zone updates, new cases,
   // duplicate-review flags, and incident confirmation bumps.

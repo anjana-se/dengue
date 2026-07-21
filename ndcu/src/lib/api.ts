@@ -18,6 +18,49 @@ const normalizeLarvae = (v: unknown): LarvaeVisible => {
   return 'unclear';
 };
 
+/** Map a raw backend report row into the frontend Report shape. Shared by the
+ *  list fetch (getReports) and the single-entity fetch (getReport) used by the
+ *  socket push handlers. zoneMap resolves zone_id → display name; pass an empty
+ *  map when unavailable (zone_name then falls back to location_name). */
+const mapRawReport = (r: any, zoneMap: Map<string, string>): Report => {
+  const ai = typeof r.ai_analysis === 'string'
+    ? (() => { try { return JSON.parse(r.ai_analysis); } catch { return {}; } })()
+    : (r.ai_analysis || {});
+  const riskLevel = ((r.risk_level || 'low') as string).toLowerCase() as any;
+  const statusRaw = r.status || '';
+  return {
+    report_id: r.id,
+    report_no: r.report_no,
+    source_type: (r.source_type || 'community') as SourceType,
+    lat: r.latitude != null ? Number(r.latitude) : 0,
+    lng: r.longitude != null ? Number(r.longitude) : 0,
+    description: r.notes || '',
+    status: (statusRaw === 'pending' || statusRaw === 'processing') ? 'processing' : 'analysed' as ReportStatus,
+    risk_level: riskLevel,
+    confidence: Math.round(Number(r.confidence_score ?? 0.5) * 100),
+    needs_human_review: statusRaw === 'needs_human_review',
+    remediation_action: r.remediation_action || 'Apply Larvicide',
+    site_type: r.site_type || 'Stagnant Water',
+    larvae_visible: normalizeLarvae(ai.larvae_visible),
+    guidance_text: r.guidance_text || 'Perform standard vector inspection.',
+    ai_analysis: {
+      water_present: !!ai.water_present,
+      site_type: r.site_type || 'Container',
+      larvae_visible: normalizeLarvae(ai.larvae_visible),
+      reasoning: ai.reasoning || '',
+      breeding_indicators: r.breeding_indicators || ai.breeding_indicators || [],
+      is_dengue_risk: !!ai.is_dengue_risk,
+      additional_notes: ai.additional_notes || '',
+      guidance_text_si: r.guidance_text_si || ai.guidance_text_si || '',
+      guidance_text_ta: r.guidance_text_ta || ai.guidance_text_ta || '',
+    },
+    zone_id: r.zone_id || '',
+    zone_name: zoneMap.get(r.zone_id || '') || r.location_name || 'Unknown Zone',
+    created_at: r.created_at || new Date().toISOString(),
+    image_url: toRelativeUpload(r.image_url),
+  };
+};
+
 const getLocal = (key: string): string | null => {
   try { return localStorage.getItem(key); } catch { return null; }
 };
@@ -185,44 +228,16 @@ export const api = {
     const zonesRes = await this.getZones();
     const zoneMap = new Map(zonesRes.map((z: Zone) => [z.zone_id, z.name]));
 
-    return rawReports.map((r: any) => {
-      const ai = typeof r.ai_analysis === 'string'
-        ? (() => { try { return JSON.parse(r.ai_analysis); } catch { return {}; } })()
-        : (r.ai_analysis || {});
-      const riskLevel = ((r.risk_level || 'low') as string).toLowerCase() as any;
-      const statusRaw = r.status || '';
-      return {
-        report_id: r.id,
-        report_no: r.report_no,
-        source_type: (r.source_type || 'community') as SourceType,
-        lat: r.latitude != null ? Number(r.latitude) : 0,
-        lng: r.longitude != null ? Number(r.longitude) : 0,
-        description: r.notes || '',
-        status: (statusRaw === 'pending' || statusRaw === 'processing') ? 'processing' : 'analysed' as ReportStatus,
-        risk_level: riskLevel,
-        confidence: Math.round(Number(r.confidence_score ?? 0.5) * 100),
-        needs_human_review: statusRaw === 'needs_human_review',
-        remediation_action: r.remediation_action || 'Apply Larvicide',
-        site_type: r.site_type || 'Stagnant Water',
-        larvae_visible: normalizeLarvae(ai.larvae_visible),
-        guidance_text: r.guidance_text || 'Perform standard vector inspection.',
-        ai_analysis: {
-          water_present: !!ai.water_present,
-          site_type: r.site_type || 'Container',
-          larvae_visible: normalizeLarvae(ai.larvae_visible),
-          reasoning: ai.reasoning || '',
-          breeding_indicators: r.breeding_indicators || ai.breeding_indicators || [],
-          is_dengue_risk: !!ai.is_dengue_risk,
-          additional_notes: ai.additional_notes || '',
-          guidance_text_si: r.guidance_text_si || ai.guidance_text_si || '',
-          guidance_text_ta: r.guidance_text_ta || ai.guidance_text_ta || '',
-        },
-        zone_id: r.zone_id || '',
-        zone_name: zoneMap.get(r.zone_id || '') || r.location_name || 'Unknown Zone',
-        created_at: r.created_at || new Date().toISOString(),
-        image_url: r.image_url ?? null,
-      };
-    });
+    return rawReports.map((r: any) => mapRawReport(r, zoneMap));
+  },
+
+  // Fetch a single report (used to hydrate the thin `report:analysed` socket event).
+  // Pass a zoneMap (built from the store's zones) so zone_name resolves without
+  // an extra /zones round-trip.
+  async getReport(reportId: string, zoneMap: Map<string, string> = new Map()): Promise<Report> {
+    const res = await this.request(`/reports/${reportId}`);
+    const raw = res.data?.data || res.data;
+    return mapRawReport(raw, zoneMap);
   },
 
   async reviewReport(reportId: string, notes: string): Promise<void> {
@@ -237,6 +252,13 @@ export const api = {
     const qs = assignedTo ? `?assigned_to=${assignedTo}&limit=100` : '?limit=100';
     const res = await this.request(`/workorders${qs}`);
     return res.data?.data || res.data || [];
+  },
+
+  // Fetch a single raw work-order row (used to hydrate `workorder:created`).
+  // Returns the raw backend shape; the store maps it via mapWorkOrder.
+  async getWorkOrder(woId: string): Promise<any> {
+    const res = await this.request(`/workorders/${woId}`);
+    return res.data?.data || res.data;
   },
 
   async createWorkOrder(reportId: string, priorityScore: number, remediationAction: string, notes?: string): Promise<any> {
