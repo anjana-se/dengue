@@ -66,6 +66,9 @@ const en = {
   submit_success_headline: "Thank you for your report",
   submit_success_body:
     "Your report has been received. We're analysing it now — track its status any time in My reports.",
+  no_breeding_site_headline: "No Breeding Site Detected",
+  no_breeding_site_body:
+    "The uploaded photo does not appear to show standing water or a mosquito breeding risk.",
   guidance_label: "What to do",
   report_another: "Report another",
   view_my_reports: "View my reports",
@@ -154,6 +157,9 @@ const si: Dict = {
   submit_success_headline: "ඔබගේ වාර්තාවට ස්තූතියි",
   submit_success_body:
     "ඔබගේ වාර්තාව ලැබී ඇත. අපි එය දැන් විශ්ලේෂණය කරමින් සිටිමු — 'මගේ වාර්තා' තුළ තත්ත්වය ඕනෑම විටෙක බලන්න.",
+  no_breeding_site_headline: "මදුරු අභිජනන ස්ථානයක් හඳුනාගෙන නොමැත",
+  no_breeding_site_body:
+    "ඔබ යැවූ ඡායාරූපයේ නිශ්චල ජලය හෝ මදුරු අභිජනන අවදානමක් පෙන්නුම් නොකරයි.",
   guidance_label: "කළ යුතු දේ",
   report_another: "තවත් වාර්තා කරන්න",
   view_my_reports: "මගේ වාර්තා බලන්න",
@@ -239,6 +245,9 @@ const ta: Dict = {
   submit_success_headline: "உங்கள் புகாருக்கு நன்றி",
   submit_success_body:
     "உங்கள் புகார் பெறப்பட்டது. நாங்கள் இப்போது பகுப்பாய்வு செய்கிறோம் — 'என் புகார்கள்' இல் நிலையை எப்போது வேண்டுமானாலும் பார்க்கலாம்.",
+  no_breeding_site_headline: "கொசு இனப்பெருக்க இடம் கண்டறியப்படவில்லை",
+  no_breeding_site_body:
+    "பதிவேற்றப்பட்ட புகைப்படத்தில் தேங்கிய நீர் அல்லது கொசு இனப்பெருக்க அபாயம் காணப்படவில்லை.",
   guidance_label: "என்ன செய்வது",
   report_another: "மற்றொன்று புகார்",
   view_my_reports: "என் புகார்களைக் காண்க",

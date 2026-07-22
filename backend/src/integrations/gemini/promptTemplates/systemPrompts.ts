@@ -45,21 +45,32 @@ OUTPUT CONTRACT:
 - Use the enum values verbatim and include every required field.
 
 FIELD RULES:
-1. water_present: true only if standing/stagnant water is visible or clearly implied; otherwise false.
-2. site_type: pick the single best-matching taxonomy value; use "other" if none fit.
-3. risk_level: use "none" when there is no breeding potential; escalate toward "high"/"critical" when water is present in a classic breeding container or larvae are visible.
-4. larvae_visible: "yes" only if larvae/pupae are actually visible in the image, "no" if clearly absent, otherwise "unclear".
-5. confidence_score: your certainty that this is an Aedes breeding site (0.0 = no evidence, 1.0 = certain).
-6. breeding_indicators: list the specific visual evidence you observed (e.g. "dark stagnant water", "mosquito larvae visible", "algae growth indicating prolonged stagnation").
-7. remediation_action: the single most appropriate action; use "no_action_needed" when risk_level is "none".
-8. is_dengue_risk: true if there is any breeding site or larvae, false otherwise.
-9. needs_human_review: true if the image is ambiguous, low quality, or you are not confident.
-10. reasoning: a brief 1–2 sentence justification for your assessment.
-11. guidance_text: a clear, actionable 1–3 sentence instruction in English for a field officer.
-12. guidance_text_si: a high-quality Sinhala (සිංහල) translation of guidance_text.
-13. guidance_text_ta: a high-quality Tamil (தமிழ்) translation of guidance_text.
+1. INVALID / NON-DENGUE IMAGE DETECTION (CRITICAL): If the photograph does NOT show a mosquito breeding site or stagnant water container (for example: photos of people, faces, indoor rooms, furniture, vehicles, animals, food, walls, blank or blurry photos):
+   - set risk_level to "none"
+   - set is_dengue_risk to false
+   - set water_present to false
+   - set larvae_visible to "no"
+   - set confidence_score to 0.20
+   - set remediation_action to "no_action_needed"
+   - set needs_human_review to true
+   - set site_type to "other"
+   - set guidance_text to "No mosquito breeding site or stagnant water detected in this photo. Please capture a clear image of the stagnant water source."
+   - set guidance_text_si to "මෙම ඡායාරූපයේ මදුරුවන් බෝවන ස්ථානයක් හෝ නිශ්චල ජලය හඳුනාගෙන නොමැත. කරුණාකර ජලය රැඳී ඇති ස්ථානයේ පැහැදිලි ඡායාරූපයක් ලබා ගන්න."
+   - set guidance_text_ta to "இந்தப் புகைப்படத்தில் கொசு இனப்பெருக்க இடமோ அல்லது தேங்கிய நீரோ கண்டறியப்படவில்லை. தயவுசெய்து நீர் தேங்கியுள்ள இடத்தை தெளிவாகப் படம் பிடித்து அனுப்பவும்."
+2. water_present: true only if standing/stagnant water is visible or clearly implied; otherwise false.
+3. site_type: pick the single best-matching taxonomy value; use "other" if none fit.
+4. risk_level: use "none" when there is no breeding potential; escalate toward "high"/"critical" when water is present in a classic breeding container or larvae are visible.
+5. larvae_visible: "yes" only if larvae/pupae are actually visible in the image, "no" if clearly absent, otherwise "unclear".
+6. confidence_score: your certainty that this is an Aedes breeding site (0.0 = no evidence, 1.0 = certain).
+7. breeding_indicators: list the specific visual evidence you observed (e.g. "dark stagnant water", "mosquito larvae visible", "algae growth indicating prolonged stagnation").
+8. remediation_action: the single most appropriate action; use "no_action_needed" when risk_level is "none".
+9. is_dengue_risk: true if there is any breeding site or larvae, false otherwise.
+10. needs_human_review: true if the image is ambiguous, low quality, non-breeding photo, or you are not confident.
+11. reasoning: a brief 1–2 sentence justification for your assessment.
+12. guidance_text: a clear, actionable 1–3 sentence instruction in English for a field officer.
+13. guidance_text_si: a high-quality Sinhala (සිංහල) translation of guidance_text.
+14. guidance_text_ta: a high-quality Tamil (தமிழ்) translation of guidance_text.
     For both translations: preserve technical terms (dengue, Aedes aegypti, larvae, larvicide) without translation, and use language appropriate for literate field officers.
-14. If the image is too blurry, too dark, blank, or clearly not a dengue-related site: set confidence_score below 0.5, risk_level "none", water_present false, needs_human_review true, and set guidance_text to "The uploaded image is blank, blurry, or does not show any Aedes mosquito breeding risks." with the correct Sinhala and Tamil translations of that message.
 
 EXPECTED JSON SCHEMA:
 ${VISION_RESPONSE_SCHEMA_EXAMPLE}`;
