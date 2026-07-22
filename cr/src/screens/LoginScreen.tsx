@@ -186,14 +186,15 @@ export function LoginScreen({
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
+        justifyContent: "center",
         padding: "32px 24px calc(24px + env(safe-area-inset-bottom))",
         animation: "dgfade .35s ease",
         background: "#FAFAF8",
+        gap: 28,
       }}
     >
       {/* Top logo & header */}
-      <div style={{ textAlign: "center", marginTop: 12 }}>
+      <div style={{ textAlign: "center" }}>
         <DengueGuardLogo style={{ width: 156, height: 44, margin: "0 auto 20px" }} />
 
         {step === "form" ? (
@@ -221,7 +222,7 @@ export function LoginScreen({
       </div>
 
       {/* Center content */}
-      <div style={{ margin: "24px 0" }}>
+      <div style={{ width: "100%", maxWidth: 360, margin: "0 auto" }}>
         {step === "form" ? (
           <>
             {/* Login Method Tabs */}
@@ -357,7 +358,7 @@ export function LoginScreen({
             {tab === "email" && (
               <form onSubmit={handleEmailSubmit}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#4b5a54", marginBottom: 8 }}>
-                  {t("mobile_label")}
+                  {t("email_label")}
                 </label>
                 <input
                   type="email"
@@ -459,7 +460,7 @@ export function LoginScreen({
                 onClick={() => setStep("form")}
                 style={{ background: "none", border: "none", color: "#6b7a74", fontSize: 14, cursor: "pointer" }}
               >
-                ← Back
+                {t("back")}
               </button>
 
               <button
@@ -481,11 +482,6 @@ export function LoginScreen({
           </form>
         )}
       </div>
-
-      {/* Privacy note */}
-      <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.45, color: "#8a978f", textAlign: "center" }}>
-        {t("privacy_note")}
-      </p>
     </div>
   );
 }

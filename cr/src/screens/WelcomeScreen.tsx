@@ -26,29 +26,42 @@ export function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
           gap: 22,
         }}
       >
-        <div
-          style={{
-            width: 132,
-            height: 132,
-            borderRadius: "50%",
-            background: "radial-gradient(circle at 50% 38%,#E8F3EC,#DCEBE2)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            position: "relative",
-          }}
-        >
-          <span
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <div
             style={{
-              position: "absolute",
               width: 132,
               height: 132,
               borderRadius: "50%",
-              border: "2px solid #65A30D",
-              animation: "dgring 2.8s ease-out infinite",
+              background: "radial-gradient(circle at 50% 38%,#E8F3EC,#DCEBE2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
             }}
-          />
-          <WelcomeGlyph />
+          >
+            <span
+              style={{
+                position: "absolute",
+                width: 132,
+                height: 132,
+                borderRadius: "50%",
+                border: "2px solid #65A30D",
+                animation: "dgring 2.8s ease-out infinite",
+              }}
+            />
+            <WelcomeGlyph />
+          </div>
+          <div
+            style={{
+              fontSize: 26,
+              fontWeight: 800,
+              letterSpacing: "-.03em",
+              color: "#0D4A3E",
+              marginTop: 6,
+            }}
+          >
+            DengueGuard
+          </div>
         </div>
         <h1
           style={{
@@ -76,6 +89,18 @@ export function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
         >
           {t("get_started")}
         </button>
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: 12,
+            color: "#8a978f",
+            fontWeight: 500,
+            marginTop: 2,
+            letterSpacing: ".02em",
+          }}
+        >
+          Powered by <span style={{ fontWeight: 700, color: "#0D4A3E" }}>AtLink</span>
+        </div>
       </div>
     </div>
   );
