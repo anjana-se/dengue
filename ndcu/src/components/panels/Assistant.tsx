@@ -3,6 +3,7 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PRIMARY } from '../../theme';
 import { useStore } from '../../store/useStore';
+import { DengueGuardMark } from '../common/DengueGuardLogo';
 
 /**
  * Compact Markdown element styling so assistant replies (bold, lists, links)
@@ -55,8 +56,9 @@ export default function Assistant() {
           margin: '0 auto',
         }}
       >
-        <div style={{ padding: '13px 18px', borderBottom: '1px solid #eef1f0', display: 'flex', alignItems: 'center', gap: 9 }}>
-          <span style={{ fontSize: 15, fontWeight: 600 }}>DengueGuard Assistant</span>
+        <div style={{ padding: '13px 18px', borderBottom: '1px solid #eef1f0', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <DengueGuardMark size={22} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: PRIMARY }}>DengueGuard Assistant</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#0b6b57', background: '#E7F7F0', padding: '2px 8px', borderRadius: 12 }}>
             EN · සිං · த
           </span>
