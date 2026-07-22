@@ -59,7 +59,7 @@ export default function AppShell() {
   return (
     <div style={{ height: '100%', display: 'flex', background: '#eef1f0' }}>
       <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
         <Topbar mapCapable={isMapView} />
         <div style={{ flex: 1, display: 'flex', minHeight: 0, padding: 14, gap: showMap && showStats ? 14 : 0 }}>
 
@@ -86,7 +86,7 @@ export default function AppShell() {
 
           {/* Content column */}
           {showStats && (
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               <ContentPanel view={view} />
             </div>
           )}

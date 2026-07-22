@@ -14,14 +14,14 @@ export const createMissionSchema = z.object({
 export type CreateMissionInput = z.infer<typeof createMissionSchema>;
 
 export const updateMissionStatusSchema = z.object({
-  status: z.enum(['in_progress', 'complete', 'aborted']),
+  status: z.enum(['in_progress', 'complete', 'completed']),
   notes: z.string().max(1000).optional(),
 });
 
 export type UpdateMissionStatusInput = z.infer<typeof updateMissionStatusSchema>;
 
 export const listMissionsSchema = z.object({
-  status: z.enum(['planned', 'in_progress', 'complete', 'aborted']).optional(),
+  status: z.enum(['in_progress', 'complete', 'completed']).optional(),
   zone_id: z.string().uuid().optional(),
   operator_id: z.string().uuid().optional(),
   page: z.coerce.number().int().positive().default(1),
