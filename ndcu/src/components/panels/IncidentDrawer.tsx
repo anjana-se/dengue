@@ -173,7 +173,8 @@ export default function IncidentDrawer() {
         </div>
       </div>
       <div style={{ fontSize: 13.5, fontWeight: 600, color: PRIMARY, marginBottom: 12 }}>
-        {inc.confirmation_count + (inc.confirmation_count > 1 ? ' reports confirm' : ' report confirms') + ' this site · ' + inc.zone_name}
+        {inc.confirmation_count + (inc.confirmation_count > 1 ? ' reports confirm' : ' report confirms') + ' this site'}
+        {inc.zone_name ? ' · ' + inc.zone_name : ''}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 18 }}>
         {meta('Created', datef(inc.created_at))}
