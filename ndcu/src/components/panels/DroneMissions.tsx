@@ -3,6 +3,7 @@ import { RISK } from '../../theme';
 import { useStore } from '../../store/useStore';
 import type { MissionStatus, RiskLevel, Mission, Report } from '../../types';
 import { api, getImageUrl } from '../../lib/api';
+import ReportDrawer from './ReportDrawer';
 
 const MISSION_BADGE: Record<MissionStatus, [string, string, string]> = {
   processing: ['#F59E0B', '#FEF5E6', 'In Progress'],
@@ -25,6 +26,7 @@ export default function DroneMissions() {
   const toast = useStore((s) => s.toast);
   const fetchData = useStore((s) => s.fetchData);
   const setActiveReport = useStore((s) => s.setActiveReport);
+  const activeReport = useStore((s) => s.activeReport);
 
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -723,6 +725,7 @@ export default function DroneMissions() {
         </div>
       </div>
 
+      {activeReport && <ReportDrawer />}
     </div>
   );
 }
