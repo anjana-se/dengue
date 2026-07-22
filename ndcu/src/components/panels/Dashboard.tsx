@@ -96,7 +96,7 @@ export default function Dashboard() {
       </div>
 
       {/* Action bar */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      {/* <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <button
           onClick={() => fetchData()}
           style={{ padding: '7px 13px', border: '1px solid #d5ddda', borderRadius: 8, background: '#fff', cursor: 'pointer', fontFamily: 'Inter', fontSize: 12.5, color: '#334b45', display: 'flex', alignItems: 'center', gap: 5 }}
@@ -121,7 +121,7 @@ export default function Dashboard() {
         >
           {trapsOn ? '✓' : '◯'} IoT traps
         </button>
-      </div>
+      </div> */}
 
       <PredAlert onViewPredictions={scrollToRec} />
 
