@@ -233,6 +233,8 @@ function mapWorkOrder(o: any, reportMap: Map<string, Report>, zoneMap: Map<strin
     outcome: o.resolution_notes || null,
     created_at: o.created_at,
     resolved_at: o.resolved_at || undefined,
+    report_id: o.report_id,
+    incident_id: r?.incident_id,
   };
 }
 
@@ -653,7 +655,16 @@ export const useStore = create<AppState>((set, get) => ({
 
   createWO: async (r) => {
     try {
-      await api.createWorkOrder(r.report_id, r.confidence, r.remediation_action, r.description);
+      const validActions = [
+        'drain_water', 'remove_container', 'apply_larvicide',
+        'cover_container', 'clear_drain', 'spray_insecticide',
+        'public_notice', 'other',
+      ];
+      const remediationAction = validActions.includes(r.remediation_action)
+        ? r.remediation_action
+        : 'other';
+
+      await api.createWorkOrder(r.report_id, r.confidence, remediationAction, r.description);
       set({ activeReport: null });
       get().toast('Work order created', 'success');
       await get().fetchData();
@@ -667,8 +678,8 @@ export const useStore = create<AppState>((set, get) => ({
       await get().createWO({
         report_id: inc.primary_report_id,
         confidence: inc.risk_level === 'critical' ? 90 : inc.risk_level === 'high' ? 72 : inc.risk_level === 'medium' ? 50 : 32,
-        remediation_action: 'Source reduction',
-        description: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
+        remediation_action: 'other',
+        notes: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
       });
       set({ selIncident: null });
     } catch (err: any) {

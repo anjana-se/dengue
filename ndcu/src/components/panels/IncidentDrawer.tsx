@@ -148,7 +148,9 @@ export default function IncidentDrawer() {
   const incDecisions = decisions.filter((d) => d.matched_incident_id === activeIncident);
   const st = INC_STATUS[inc.status];
   const admin = role === 'ndcu_admin';
-  const hasWO = orders.some((o) => o.incident_id === inc.incident_id);
+  const hasWO = orders.some(
+    (o) => o.incident_id === inc.incident_id || o.report_id === inc.primary_report_id,
+  );
 
   const meta = (k: string, v: string | null) => (
     <div style={{ background: '#f4f7f6', borderRadius: 8, padding: '8px 11px' }}>

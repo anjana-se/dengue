@@ -106,6 +106,7 @@ export interface WorkOrder {
   outcome: string | null;
   created_at: string;
   resolved_at?: string;
+  report_id?: string;
   incident_id?: string;
   confirmation_count?: number;
 }
