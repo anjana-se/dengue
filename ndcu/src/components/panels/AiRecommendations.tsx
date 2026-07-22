@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { PRIMARY } from '../../theme';
 import { siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
+import { api } from '../../lib/api';
 import type { Report, Zone } from '../../types';
 
 /**
@@ -74,17 +76,28 @@ function buildRecommendations(zones: Zone[], reports: Report[]) {
   });
 }
 
+type Rec = ReturnType<typeof buildRecommendations>[number];
+
 export default function AiRecommendations() {
   const zones = useStore((s) => s.zones);
   const reports = useStore((s) => s.reports);
   const createWO = useStore((s) => s.createWO);
 
-  const recs = buildRecommendations(zones, reports);
+  const [serverRecs, setServerRecs] = useState<Rec[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.getRecommendations()
+      .then((rows) => { if (!cancelled) setServerRecs(rows as Rec[]); })
+      .catch(() => { if (!cancelled) setServerRecs(null); });
+    return () => { cancelled = true; };
+  }, [zones.length, reports.length]);
+
+  const recs = serverRecs ?? buildRecommendations(zones, reports);
 
   if (recs.length === 0) {
     return (
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8e5', padding: '20px 16px' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>AI Recommendations</div>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Recommendations</div>
         <div style={{ fontSize: 13, color: '#94a29d', textAlign: 'center', padding: '20px 0' }}>
           No high-risk zones detected. All zones are at acceptable risk levels.
         </div>
@@ -102,8 +115,10 @@ export default function AiRecommendations() {
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8e5', overflow: 'hidden' }}>
       <div style={{ padding: '13px 16px', borderBottom: '1px solid #eef1f0', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 15, fontWeight: 600 }}>AI Recommendations</span>
-        <span style={{ fontSize: 11, color: '#94a29d' }}>· live data · priority order</span>
+        <span style={{ fontSize: 15, fontWeight: 600 }}>Recommendations</span>
+        <span style={{ fontSize: 11, color: '#94a29d' }}>
+          {serverRecs ? '· deterministic engine · priority order' : '· live data · priority order'}
+        </span>
       </div>
 
       {recs.map((r) => {

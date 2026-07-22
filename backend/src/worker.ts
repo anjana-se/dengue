@@ -3,6 +3,7 @@ import { logger } from './shared/logger';
 import { pool } from './db/client';
 import { startWorker, stopWorker } from './ai/queue/consumer';
 import { startZoneRiskRecomputeJob, stopZoneRiskRecomputeJob } from './jobs/zoneRiskRecompute.job';
+import { startRecommendationsRecomputeJob, stopRecommendationsRecomputeJob } from './jobs/recommendationsRecompute.job';
 import { initSocketEmitter } from './services/notifications/socket.server';
 
 /**
@@ -23,6 +24,9 @@ async function bootstrap() {
   // Start the zone risk recompute cron job
   startZoneRiskRecomputeJob();
 
+  // Start the AI recommendations recompute cron job (runs once at boot, then every cycle)
+  startRecommendationsRecomputeJob();
+
   logger.info('✅ AI analysis worker running. Listening for jobs on queue: ai-analysis');
 
   // ─── Graceful shutdown ──────────────────────────────────────────────────────
@@ -30,6 +34,7 @@ async function bootstrap() {
     logger.info(`Worker received ${signal}. Shutting down gracefully...`);
     await stopWorker();
     stopZoneRiskRecomputeJob();
+    stopRecommendationsRecomputeJob();
     await pool.end();
     logger.info('Worker shut down. DB pool drained.');
     process.exit(0);

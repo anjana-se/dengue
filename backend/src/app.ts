@@ -18,6 +18,7 @@ import { dashboardRouter } from './services/dashboard/dashboard.routes';
 import casesRouter from './services/cases/cases.routes';
 import trapsRouter from './services/traps/traps.routes';
 import incidentsRouter from './services/incidents/incidents.routes';
+import { recommendationsRouter } from './services/recommendations/recommendations.routes';
 
 /**
  * app.ts — Express application assembly.
@@ -79,6 +80,7 @@ export function createApp() {
   app.use(`${config.API_BASE_PATH}/cases`, casesRouter);
   app.use(`${config.API_BASE_PATH}/traps`, trapsRouter);
   app.use(`${config.API_BASE_PATH}/incidents`, incidentsRouter);
+  app.use(`${config.API_BASE_PATH}/recommendations`, recommendationsRouter);
 
 
   // ─── 404 fallback ────────────────────────────────────────────────────────────

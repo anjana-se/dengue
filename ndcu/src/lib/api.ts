@@ -383,6 +383,12 @@ export const api = {
     return res.data;
   },
 
+  // ── Recommendations ────────────────────────────────────────────────
+  async getRecommendations(limit = 5): Promise<any[]> {
+    const res = await this.request(`/recommendations?limit=${limit}`);
+    return res.data || [];
+  },
+
   async exportCsv(): Promise<void> {
     const token = this.getAccessToken();
     const res = await fetch(`${API_BASE}/dashboard/export`, {
