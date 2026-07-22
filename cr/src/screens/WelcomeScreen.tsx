@@ -89,6 +89,18 @@ export function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
         >
           {t("get_started")}
         </button>
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: 12,
+            color: "#8a978f",
+            fontWeight: 500,
+            marginTop: 2,
+            letterSpacing: ".02em",
+          }}
+        >
+          Powered by <span style={{ fontWeight: 700, color: "#0D4A3E" }}>AtLink</span>
+        </div>
       </div>
     </div>
   );

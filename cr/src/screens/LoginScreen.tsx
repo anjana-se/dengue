@@ -357,7 +357,7 @@ export function LoginScreen({
             {tab === "email" && (
               <form onSubmit={handleEmailSubmit}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#4b5a54", marginBottom: 8 }}>
-                  {t("mobile_label")}
+                  {t("email_label")}
                 </label>
                 <input
                   type="email"
@@ -459,7 +459,7 @@ export function LoginScreen({
                 onClick={() => setStep("form")}
                 style={{ background: "none", border: "none", color: "#6b7a74", fontSize: 14, cursor: "pointer" }}
               >
-                ← Back
+                {t("back")}
               </button>
 
               <button
