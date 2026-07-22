@@ -84,7 +84,7 @@ export default function MapLegend() {
       style={{
         position: 'absolute',
         bottom: 12,
-        right: 12,
+        left: 12,
         zIndex: 500,
         width: open ? 178 : 'auto',
         background: '#fff',

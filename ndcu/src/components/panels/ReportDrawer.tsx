@@ -84,6 +84,26 @@ export default function ReportDrawer() {
         {r.zone_name} · {r.lat.toFixed(4)}, {r.lng.toFixed(4)} · {timf(r.created_at)}
       </div>
 
+      {/* EXIF Validation Warning Notice */}
+      {r.description && r.description.includes('[EXIF VALIDATION FAILED]') && (
+        <div
+          style={{
+            background: '#FEE2E2',
+            borderLeft: '4px solid #EF4444',
+            borderRadius: 8,
+            padding: '11px 13px',
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 3 }}>
+            ⚠️ EXIF Validation Issue
+          </div>
+          <div style={{ fontSize: 12.5, color: '#991B1B', fontWeight: 500, lineHeight: 1.4 }}>
+            {r.description.replace('[EXIF VALIDATION FAILED]', '').trim()}
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           fontSize: 11,

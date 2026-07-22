@@ -201,10 +201,10 @@ export async function updateIncidentStats(incidentId: string) {
 export async function updateIncidentStatus(incidentId: string, status: string) {
   const result = await query(
     `UPDATE incidents SET
-       status = $2,
+       status = $2::VARCHAR,
        updated_at = NOW(),
-       verified_at = CASE WHEN $2 = 'verified' THEN NOW() ELSE verified_at END,
-       resolved_at = CASE WHEN $2 = 'resolved' THEN NOW() ELSE resolved_at END
+       verified_at = CASE WHEN $2::VARCHAR = 'verified' THEN NOW() ELSE verified_at END,
+       resolved_at = CASE WHEN $2::VARCHAR = 'resolved' THEN NOW() ELSE resolved_at END
      WHERE id = $1
      RETURNING *`,
     [incidentId, status]

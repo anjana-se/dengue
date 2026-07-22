@@ -12,7 +12,9 @@ export default function IncidentPopup() {
   if (!inc) return null;
 
   const st = INC_STATUS[inc.status];
-  const hasWO = orders.some((o) => o.incident_id === inc.incident_id);
+  const hasWO = orders.some(
+    (o) => o.incident_id === inc.incident_id || o.report_id === inc.primary_report_id,
+  );
 
   return (
     <div

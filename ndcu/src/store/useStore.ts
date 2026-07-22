@@ -153,8 +153,8 @@ export interface AppState {
   fetchData: () => Promise<void>;
   fetchStaffUsers: () => Promise<void>;
   createWO: (r: Report) => Promise<void>;
-  createWOFromIncident: (inc: Incident) => void;
-  createWOFromTrap: (t: Trap, reason: string) => void;
+  createWOFromIncident: (inc: Incident) => Promise<void>;
+  createWOFromTrap: (t: Trap, reason: string) => Promise<void>;
   dispatch: (woId: string, phi: Phi | null, instr: string) => Promise<void>;
   resolveWO: (woId: string) => Promise<void>;
   acceptWO: (woId: string) => Promise<void>;
@@ -233,6 +233,8 @@ function mapWorkOrder(o: any, reportMap: Map<string, Report>, zoneMap: Map<strin
     outcome: o.resolution_notes || null,
     created_at: o.created_at,
     resolved_at: o.resolved_at || undefined,
+    report_id: o.report_id,
+    incident_id: r?.incident_id,
   };
 }
 
@@ -378,7 +380,15 @@ export const useStore = create<AppState>((set, get) => ({
           missions: missions.map((m: any) => ({
             mission_id: m.id,
             mission_name: m.name,
-            status: m.status === 'complete' ? 'complete' : m.status === 'in_progress' ? 'processing' : 'open',
+            status: (m.status === 'complete' || m.status === 'completed') ? 'complete' : 'processing',
+            zone_id: m.zone_id,
+            zone_name: zoneMap.get(m.zone_id || '') || 'Target Survey Zone',
+            operator_id: m.operator_id,
+            planned_area: m.planned_area,
+            notes: m.notes,
+            started_at: m.started_at,
+            completed_at: m.completed_at,
+            created_at: m.created_at,
             image_count: m.total_images || 0,
             processed_count: m.processed_images || 0,
             summary: m.summary || { critical: 0, high: 0, medium: 0, low: 0 },
@@ -446,7 +456,15 @@ export const useStore = create<AppState>((set, get) => ({
         missions: missions.map((m: any) => ({
           mission_id: m.id,
           mission_name: m.name,
-          status: m.status === 'complete' ? 'complete' : m.status === 'in_progress' ? 'processing' : 'open',
+          status: (m.status === 'complete' || m.status === 'completed') ? 'complete' : 'processing',
+          zone_id: m.zone_id,
+          zone_name: zoneMap.get(m.zone_id || '') || 'Target Survey Zone',
+          operator_id: m.operator_id,
+          planned_area: m.planned_area,
+          notes: m.notes,
+          started_at: m.started_at,
+          completed_at: m.completed_at,
+          created_at: m.created_at,
           image_count: m.total_images || 0,
           processed_count: m.processed_images || 0,
           summary: m.summary || { critical: 0, high: 0, medium: 0, low: 0 },
@@ -653,7 +671,16 @@ export const useStore = create<AppState>((set, get) => ({
 
   createWO: async (r) => {
     try {
-      await api.createWorkOrder(r.report_id, r.confidence, r.remediation_action, r.description);
+      const validActions = [
+        'drain_water', 'remove_container', 'apply_larvicide',
+        'cover_container', 'clear_drain', 'spray_insecticide',
+        'public_notice', 'other',
+      ];
+      const remediationAction = validActions.includes(r.remediation_action)
+        ? r.remediation_action
+        : 'other';
+
+      await api.createWorkOrder(r.report_id, r.confidence, remediationAction, r.description);
       set({ activeReport: null });
       get().toast('Work order created', 'success');
       await get().fetchData();
@@ -662,68 +689,30 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  createWOFromIncident: (inc) => {
-    const wo: WorkOrder = {
-      wo_id: 'WO' + Math.floor(Math.random() * 900 + 300),
-      status: 'new',
-      priority_score:
-        inc.risk_level === 'critical' ? 90 : inc.risk_level === 'high' ? 72 : inc.risk_level === 'medium' ? 50 : 32,
-      assigned_to: null,
-      lat: inc.lat,
-      lng: inc.lng,
-      zone_name: inc.zone_name,
-      zone_id: inc.zone_id,
-      risk_level: inc.risk_level,
-      confidence: 85,
-      site_type: inc.site_type,
-      remediation_action: 'Source reduction',
-      guidance_text:
-        'Locate the flagged container and remove standing water. Apply larvicide and record before/after photos.',
-      larvae_visible: (inc.risk_level === 'critical' || inc.risk_level === 'high') ? 'yes' : 'no',
-      image_url: null,
-      description: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
-      incident_id: inc.incident_id,
-      confirmation_count: inc.confirmation_count,
-      ndcu_instructions: '',
-      notes: '',
-      outcome: null,
-      created_at: new Date().toISOString(),
-    };
-    set((s) => ({ orders: [wo, ...s.orders], selIncident: null }));
-    get().toast('Work order ' + wo.wo_id + ' created for ' + inc.code, 'success');
+  createWOFromIncident: async (inc) => {
+    try {
+      await get().createWO({
+        report_id: inc.primary_report_id,
+        confidence: inc.risk_level === 'critical' ? 90 : inc.risk_level === 'high' ? 72 : inc.risk_level === 'medium' ? 50 : 32,
+        remediation_action: 'other',
+        notes: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
+      });
+      set({ selIncident: null });
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to create work order from incident', 'error');
+    }
   },
 
-  createWOFromTrap: (t, reason) => {
-    const rl = t.readings.larvae_detected ? 'high' : 'medium';
-    const wo: WorkOrder = {
-      wo_id: 'WO' + Math.floor(Math.random() * 900 + 300),
-      status: 'new',
-      priority_score: Math.min(99, 60 + Math.round(t.readings.mosquito_count_24h / 2)),
-      assigned_to: null,
-      lat: t.lat,
-      lng: t.lng,
-      zone_name: t.zone_name,
-      zone_id: t.zone_id,
-      risk_level: rl,
-      confidence: 88,
-      site_type: 'IoT trap alert',
-      remediation_action: 'Inspect trap site',
-      guidance_text:
-        'Inspect the area around trap ' + t.serial_number + '. Reason: ' + reason + '. Check for nearby breeding sources, remove standing water, and verify the trap hardware and battery.',
-      larvae_visible: t.readings.larvae_detected ? 'yes' : 'no',
-      image_url: null,
-      description: 'Trap ' + t.serial_number + ' (' + t.zone_name + ') — ' + reason,
-      ndcu_instructions: '',
-      notes: '',
-      outcome: null,
-      created_at: new Date().toISOString(),
-    };
-    set((s) => ({ orders: [wo, ...s.orders], activeOrder: wo }));
-    get().toast('Work order ' + wo.wo_id + ' created from ' + t.serial_number, 'success');
+  createWOFromTrap: async (t, reason) => {
+    get().toast('Trap work orders cannot be created on the server yet. Create a work order from the related report instead.', 'error');
   },
 
   dispatch: async (woId, phi, _instr) => {
     if (!phi) { get().toast('Select a PHI officer first', 'error'); return; }
+    if (/^WO\d+$/.test(woId)) {
+      get().toast('This work order is only local and cannot be dispatched. Create it on the server before assigning.', 'error');
+      return;
+    }
     try {
       await api.assignWorkOrder(woId, phi.user_id);
       set({ dispatchOrder: null, activeOrder: null });

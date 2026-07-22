@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { PRIMARY } from '../../theme';
 import { siteTypeLabel } from '../../utils/format';
 import { useStore } from '../../store/useStore';
@@ -7,10 +7,17 @@ import type { Phi } from '../../types';
 export default function DispatchModal() {
   const o = useStore((s) => s.dispatchOrder);
   const staffUsers = useStore((s) => s.staffUsers);
+  const fetchStaffUsers = useStore((s) => s.fetchStaffUsers);
   const setDispatchOrder = useStore((s) => s.setDispatchOrder);
   const dispatch = useStore((s) => s.dispatch);
   const selRef = useRef<HTMLSelectElement | null>(null);
   const instrRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (o && staffUsers.length === 0) {
+      fetchStaffUsers().catch(() => {});
+    }
+  }, [o, staffUsers.length, fetchStaffUsers]);
 
   if (!o) return null;
 
