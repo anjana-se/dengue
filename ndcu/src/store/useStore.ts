@@ -152,7 +152,7 @@ export interface AppState {
   // ── data ops ──
   fetchData: () => Promise<void>;
   fetchStaffUsers: () => Promise<void>;
-  createWO: (r: Report) => Promise<void>;
+  createWO: (r: Pick<Report, 'report_id' | 'confidence' | 'remediation_action' | 'description'>) => Promise<void>;
   createWOFromIncident: (inc: Incident) => Promise<void>;
   createWOFromTrap: (t: Trap, reason: string) => Promise<void>;
   dispatch: (woId: string, phi: Phi | null, instr: string) => Promise<void>;
@@ -695,7 +695,7 @@ export const useStore = create<AppState>((set, get) => ({
         report_id: inc.primary_report_id,
         confidence: inc.risk_level === 'critical' ? 90 : inc.risk_level === 'high' ? 72 : inc.risk_level === 'medium' ? 50 : 32,
         remediation_action: 'other',
-        notes: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
+        description: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
       });
       set({ selIncident: null });
     } catch (err: any) {
