@@ -153,8 +153,8 @@ export interface AppState {
   fetchData: () => Promise<void>;
   fetchStaffUsers: () => Promise<void>;
   createWO: (r: Report) => Promise<void>;
-  createWOFromIncident: (inc: Incident) => void;
-  createWOFromTrap: (t: Trap, reason: string) => void;
+  createWOFromIncident: (inc: Incident) => Promise<void>;
+  createWOFromTrap: (t: Trap, reason: string) => Promise<void>;
   dispatch: (woId: string, phi: Phi | null, instr: string) => Promise<void>;
   resolveWO: (woId: string) => Promise<void>;
   acceptWO: (woId: string) => Promise<void>;
@@ -662,68 +662,30 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  createWOFromIncident: (inc) => {
-    const wo: WorkOrder = {
-      wo_id: 'WO' + Math.floor(Math.random() * 900 + 300),
-      status: 'new',
-      priority_score:
-        inc.risk_level === 'critical' ? 90 : inc.risk_level === 'high' ? 72 : inc.risk_level === 'medium' ? 50 : 32,
-      assigned_to: null,
-      lat: inc.lat,
-      lng: inc.lng,
-      zone_name: inc.zone_name,
-      zone_id: inc.zone_id,
-      risk_level: inc.risk_level,
-      confidence: 85,
-      site_type: inc.site_type,
-      remediation_action: 'Source reduction',
-      guidance_text:
-        'Locate the flagged container and remove standing water. Apply larvicide and record before/after photos.',
-      larvae_visible: (inc.risk_level === 'critical' || inc.risk_level === 'high') ? 'yes' : 'no',
-      image_url: null,
-      description: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
-      incident_id: inc.incident_id,
-      confirmation_count: inc.confirmation_count,
-      ndcu_instructions: '',
-      notes: '',
-      outcome: null,
-      created_at: new Date().toISOString(),
-    };
-    set((s) => ({ orders: [wo, ...s.orders], selIncident: null }));
-    get().toast('Work order ' + wo.wo_id + ' created for ' + inc.code, 'success');
+  createWOFromIncident: async (inc) => {
+    try {
+      await get().createWO({
+        report_id: inc.primary_report_id,
+        confidence: inc.risk_level === 'critical' ? 90 : inc.risk_level === 'high' ? 72 : inc.risk_level === 'medium' ? 50 : 32,
+        remediation_action: 'Source reduction',
+        description: 'Incident ' + inc.code + ' — ' + inc.confirmation_count + ' confirming report(s) at ' + inc.zone_name + '.',
+      });
+      set({ selIncident: null });
+    } catch (err: any) {
+      get().toast(err.message || 'Failed to create work order from incident', 'error');
+    }
   },
 
-  createWOFromTrap: (t, reason) => {
-    const rl = t.readings.larvae_detected ? 'high' : 'medium';
-    const wo: WorkOrder = {
-      wo_id: 'WO' + Math.floor(Math.random() * 900 + 300),
-      status: 'new',
-      priority_score: Math.min(99, 60 + Math.round(t.readings.mosquito_count_24h / 2)),
-      assigned_to: null,
-      lat: t.lat,
-      lng: t.lng,
-      zone_name: t.zone_name,
-      zone_id: t.zone_id,
-      risk_level: rl,
-      confidence: 88,
-      site_type: 'IoT trap alert',
-      remediation_action: 'Inspect trap site',
-      guidance_text:
-        'Inspect the area around trap ' + t.serial_number + '. Reason: ' + reason + '. Check for nearby breeding sources, remove standing water, and verify the trap hardware and battery.',
-      larvae_visible: t.readings.larvae_detected ? 'yes' : 'no',
-      image_url: null,
-      description: 'Trap ' + t.serial_number + ' (' + t.zone_name + ') — ' + reason,
-      ndcu_instructions: '',
-      notes: '',
-      outcome: null,
-      created_at: new Date().toISOString(),
-    };
-    set((s) => ({ orders: [wo, ...s.orders], activeOrder: wo }));
-    get().toast('Work order ' + wo.wo_id + ' created from ' + t.serial_number, 'success');
+  createWOFromTrap: async (t, reason) => {
+    get().toast('Trap work orders cannot be created on the server yet. Create a work order from the related report instead.', 'error');
   },
 
   dispatch: async (woId, phi, _instr) => {
     if (!phi) { get().toast('Select a PHI officer first', 'error'); return; }
+    if (/^WO\d+$/.test(woId)) {
+      get().toast('This work order is only local and cannot be dispatched. Create it on the server before assigning.', 'error');
+      return;
+    }
     try {
       await api.assignWorkOrder(woId, phi.user_id);
       set({ dispatchOrder: null, activeOrder: null });

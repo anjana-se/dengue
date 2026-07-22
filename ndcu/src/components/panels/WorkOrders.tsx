@@ -38,6 +38,7 @@ function isPointInPolygon(pt: [number, number], poly: [number, number][]) {
 
 export default function WorkOrders() {
   const orders = useStore((s) => s.orders);
+  const staffUsers = useStore((s) => s.staffUsers);
   const role = useStore((s) => s.role);
   const setActiveOrder = useStore((s) => s.setActiveOrder);
   const setDispatchOrder = useStore((s) => s.setDispatchOrder);
@@ -246,7 +247,9 @@ export default function WorkOrders() {
                     <td style={{ padding: '10px 14px', fontWeight: 600 }}>{o.zone_name}</td>
                     <td style={{ padding: '10px 14px', color: '#334b45' }}>{siteTypeLabel(o.site_type)}</td>
                     <td style={{ padding: '10px 14px', color: o.assigned_to ? '#334b45' : '#c0392b', fontWeight: o.assigned_to ? 400 : 600 }}>
-                      {o.assigned_to ? o.assigned_to.name : 'Unassigned'}
+                      {o.assigned_to
+                        ? staffUsers.find((u) => u.id === o.assigned_to!.user_id)?.full_name || o.assigned_to.name
+                        : 'Unassigned'}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <Pill status={o.status} />
@@ -275,7 +278,7 @@ export default function WorkOrders() {
                           </button>
                         )}
                         {/* Admin: dispatch unassigned */}
-                        {role === 'ndcu_admin' && o.status !== 'resolved' && (
+                        {role === 'ndcu_admin' && o.status !== 'resolved' && !o.assigned_to && (
                           <button
                             onClick={() => setDispatchOrder(o)}
                             style={{ padding: '5px 11px', border: '1px solid #d5ddda', borderRadius: 6, background: '#f4f7f6', cursor: 'pointer', fontSize: 12, fontFamily: 'Inter', color: '#334b45' }}
