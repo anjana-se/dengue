@@ -4,6 +4,7 @@ import { listWorkOrders } from '../../../db/queries/workorders.queries';
 import { listTraps } from '../../../db/queries/traps.queries';
 import { listIncidents } from '../../../db/queries/incidents.queries';
 import { listCases } from '../../../db/queries/cases.queries';
+import { listForecasts } from '../../../db/queries/forecasts.queries';
 import { getDashboardSummaryService } from '../../dashboard/dashboard.service';
 import type { ChatToolDef } from '../../../integrations/chatAssistant';
 import type { ChatTool, ToolContext } from './types';
@@ -252,6 +253,36 @@ export const chatTools: ChatTool[] = [
         by_status,
         note: 'Aggregate counts only — patient identifiers are intentionally not exposed.',
       };
+    },
+  },
+  {
+    name: 'get_outbreak_forecast',
+    description:
+      'Get 14-day dengue outbreak forecasts per zone: outbreak probability (0-1), alert level (watch/warning/emergency), risk trend (rising/stable/falling), confidence, and contributing factors (rainfall, temperature, humidity, breeding-site density, recent case count). Optionally filter by alert_level or a minimum outbreak probability. Use for questions about predicted risk or which zones to prioritise.',
+    parameters: {
+      type: 'object',
+      properties: {
+        alert_level: { type: 'string', enum: ['watch', 'warning', 'emergency'], description: 'Filter to a single alert level.' },
+        min_probability: { type: 'number', description: 'Only forecasts with outbreak probability at or above this value (0-1).' },
+      },
+    },
+    handler: async (args) => {
+      const minProb =
+        typeof args.min_probability === 'number' ? args.min_probability : undefined;
+      const forecasts = await listForecasts({
+        alert_level: asString(args.alert_level),
+        min_probability: minProb,
+      });
+      return forecasts.map((f) => ({
+        zone_name: f.zone_name,
+        forecast_horizon_days: f.forecast_horizon_days,
+        outbreak_probability: f.outbreak_probability,
+        alert_level: f.alert_level,
+        risk_trend: f.risk_trend,
+        confidence: f.confidence,
+        contributing_factors: f.contributing_factors,
+        recommended_action: f.recommended_action,
+      }));
     },
   },
   {

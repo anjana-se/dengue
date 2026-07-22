@@ -11,6 +11,7 @@
     "start:worker": "node dist/src/worker.js",
     "migrate": "ts-node scripts/migrate.ts",
     "seed": "ts-node scripts/seed.ts",
+    "seed:mock": "ts-node scripts/seedMockData.ts",
     "clear:zones": "ts-node scripts/clear_zones.ts",
     "reset:queue": "ts-node scripts/reset_ai_queue.ts",
     "reset:all": "ts-node scripts/reset_all_reports_and_zones.ts",

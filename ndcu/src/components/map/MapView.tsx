@@ -154,6 +154,9 @@ export default function MapView() {
   const caseIsClusterRef = useRef(false);
   const heatRef = useRef<HeatLayer | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
+  // Tracks whether we've already auto-fit the map for the current view, so background
+  // data polls don't keep snapping the camera back over the user's manual pan/zoom.
+  const didAutoFitRef = useRef(false);
 
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(13); // Local map zoom level state
@@ -379,9 +382,12 @@ export default function MapView() {
       L.marker([inc.lat, inc.lng], { icon }).addTo(g).on('click', () => selectIncident(inc));
     });
 
-    // Auto-fit map view bounds to reported incidents/reports if available
+    // Auto-fit map view bounds to reported incidents/reports — but only once per view.
+    // Background 9s polls replace `reports`/`incidents` and re-run this effect; without
+    // the guard, fitBounds would reset the camera each cycle and discard the user's
+    // manual pan/zoom.
     const map = mapRef.current;
-    if (map) {
+    if (map && !didAutoFitRef.current) {
       const activePts: [number, number][] = [];
       incidents.forEach((i) => activePts.push([i.lat, i.lng]));
       reports.forEach((r) => { if (r.lat != null && r.lng != null) activePts.push([r.lat, r.lng]); });
@@ -389,10 +395,17 @@ export default function MapView() {
         try {
           const bounds = L.latLngBounds(activePts);
           map.fitBounds(bounds, { maxZoom: 14, padding: [50, 50] });
+          didAutoFitRef.current = true; // don't re-fit on later polls
         } catch {}
       }
     }
   }, [ready, layers.community, view, incidents, reports, orders, selectIncident, setActiveOrder, setActiveReport]);
+
+  // Re-enable auto-fit when the user switches views, so each view re-frames its data
+  // once (then stays put across background polls).
+  useEffect(() => {
+    didAutoFitRef.current = false;
+  }, [view]);
 
   // ---- outbreak-forecast bands (dynamic per zone risk level) ----
   useEffect(() => {

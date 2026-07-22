@@ -157,8 +157,8 @@ CURRENT PLATFORM SUMMARY (a live, aggregate snapshot — authoritative for the n
 ${contextJson}
 
 YOU HAVE TOOLS. In addition to the summary above, you can call read-only tools to
-fetch specific live data — reports, work orders, IoT traps, incidents, per-zone
-stats, and aggregate case counts. Decide as follows:
+fetch specific live data — reports, work orders, IoT traps, incidents, 14-day
+outbreak forecasts, per-zone stats, and aggregate case counts. Decide as follows:
 - If the summary above already answers the question, answer from it directly with NO tool call.
 - If the user asks about specific records, filters, or a detail not in the summary
   (e.g. "critical reports in Colombo", "offline traps", "open work orders"), call the

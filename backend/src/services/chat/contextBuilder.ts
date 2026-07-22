@@ -23,7 +23,7 @@ export async function buildChatContext(): Promise<string> {
   }
 
   try {
-    const [zones, reportStats, workorderStats, trapStats, incidentStats] = await Promise.all([
+    const [zones, reportStats, workorderStats, trapStats, incidentStats, forecastStats] = await Promise.all([
       listZones(),
       query<{
         critical_open: string;
@@ -55,12 +55,22 @@ export async function buildChatContext(): Promise<string> {
       query<{ open: string }>(`
         SELECT COUNT(*) FILTER (WHERE status = 'open') AS open FROM incidents
       `),
+      query<{ total: string; emergency: string; warning: string; top_zone: string | null; top_prob: string | null }>(`
+        SELECT
+          COUNT(*)                                          AS total,
+          COUNT(*) FILTER (WHERE alert_level = 'emergency') AS emergency,
+          COUNT(*) FILTER (WHERE alert_level = 'warning')   AS warning,
+          (SELECT zone_name FROM forecasts ORDER BY outbreak_probability DESC LIMIT 1)           AS top_zone,
+          (SELECT outbreak_probability FROM forecasts ORDER BY outbreak_probability DESC LIMIT 1) AS top_prob
+        FROM forecasts
+      `),
     ]);
 
     const rs = reportStats.rows[0];
     const ws = workorderStats.rows[0];
     const ts = trapStats.rows[0];
     const is = incidentStats.rows[0];
+    const fs = forecastStats.rows[0];
     const n = (v: string | undefined) => parseInt(v ?? '0', 10);
 
     const context = {
@@ -85,6 +95,13 @@ export async function buildChatContext(): Promise<string> {
         work_orders: { open: n(ws?.open), accepted: n(ws?.accepted), resolved: n(ws?.resolved) },
         traps: { total: n(ts?.total), offline: n(ts?.offline), low_battery: n(ts?.low_battery) },
         incidents_open: n(is?.open),
+        forecasts: {
+          total: n(fs?.total),
+          emergency_zones: n(fs?.emergency),
+          warning_zones: n(fs?.warning),
+          highest_risk_zone: fs?.top_zone ?? null,
+          highest_outbreak_probability: fs?.top_prob != null ? Number(fs.top_prob) : null,
+        },
       },
     };
 
