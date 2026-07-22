@@ -228,7 +228,47 @@ export const api = {
     const zonesRes = await this.getZones();
     const zoneMap = new Map(zonesRes.map((z: Zone) => [z.zone_id, z.name]));
 
-    return rawReports.map((r: any) => mapRawReport(r, zoneMap));
+    return rawReports.map((r: any) => {
+      const ai = typeof r.ai_analysis === 'string'
+        ? (() => { try { return JSON.parse(r.ai_analysis); } catch { return {}; } })()
+        : (r.ai_analysis || {});
+      const riskLevel = ((r.risk_level || 'low') as string).toLowerCase() as any;
+      const statusRaw = r.status || '';
+      return {
+        report_id: r.id,
+        report_no: r.report_no,
+        source_type: (r.source_type || 'community') as SourceType,
+        lat: r.latitude != null ? Number(r.latitude) : 0,
+        lng: r.longitude != null ? Number(r.longitude) : 0,
+        description: r.notes || '',
+        status: (statusRaw === 'pending' || statusRaw === 'processing') ? 'processing' : 'analysed' as ReportStatus,
+        risk_level: riskLevel,
+        confidence: Math.round(Number(r.confidence_score ?? 0.5) * 100),
+        needs_human_review: statusRaw === 'needs_human_review',
+        remediation_action: r.remediation_action || 'Apply Larvicide',
+        site_type: r.site_type || 'Stagnant Water',
+        larvae_visible: normalizeLarvae(ai.larvae_visible),
+        guidance_text: r.guidance_text || 'Perform standard vector inspection.',
+        ai_analysis: {
+          water_present: !!ai.water_present,
+          site_type: r.site_type || 'Container',
+          larvae_visible: normalizeLarvae(ai.larvae_visible),
+          reasoning: ai.reasoning || '',
+          breeding_indicators: r.breeding_indicators || ai.breeding_indicators || [],
+          is_dengue_risk: !!ai.is_dengue_risk,
+          additional_notes: ai.additional_notes || '',
+          guidance_text_si: r.guidance_text_si || ai.guidance_text_si || '',
+          guidance_text_ta: r.guidance_text_ta || ai.guidance_text_ta || '',
+        },
+        zone_id: r.zone_id || '',
+        zone_name: zoneMap.get(r.zone_id || '')
+          || (r.zone_name ? (r.zone_district ? `${r.zone_district} — ${r.zone_name}` : r.zone_name) : null)
+          || r.location_name
+          || (r.latitude != null && r.longitude != null ? `${Number(r.latitude).toFixed(4)}, ${Number(r.longitude).toFixed(4)}` : 'Unknown Zone'),
+        created_at: r.created_at || new Date().toISOString(),
+        image_url: r.image_url ?? null,
+      };
+    });
   },
 
   // Fetch a single report (used to hydrate the thin `report:analysed` socket event).
@@ -436,7 +476,10 @@ export const api = {
       site_type: r.site_type || inc?.site_type || 'other',
       lat: r.lat != null ? Number(r.lat) : (inc?.lat ?? 0),
       lng: r.lng != null ? Number(r.lng) : (inc?.lng ?? 0),
-      zone_name: r.location_name || inc?.zone_name || 'Unknown Zone',
+      zone_name: r.location_name
+        || (r.zone_name ? (r.zone_district ? `${r.zone_district} — ${r.zone_name}` : r.zone_name) : null)
+        || inc?.zone_name
+        || (r.lat != null && r.lng != null ? `${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}` : 'Unknown Zone'),
       incident_id: id,
       larvae_visible: normalizeLarvae(r.larvae_visible),
       water_present: !!r.water_present,

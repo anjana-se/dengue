@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { PRIMARY } from '../theme';
 import { useStore } from '../store/useStore';
+import { DengueGuardLogo } from './common/DengueGuardLogo';
 
 const inputStyle: CSSProperties = {
   width: '100%',
@@ -66,32 +67,14 @@ export default function Login() {
         }}
       >
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 11,
-              background: `linear-gradient(135deg, ${PRIMARY}, #0a4f3f)`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 20,
-              boxShadow: '0 4px 12px rgba(13,74,62,.4)',
-            }}
-          >
-            D
-          </div>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: PRIMARY, letterSpacing: '-.03em', lineHeight: 1.1 }}>
-              DengueGuard
-            </div>
-            <div style={{ fontSize: 11.5, color: '#7fb0a4', fontWeight: 500, letterSpacing: '.01em' }}>
-              Operations Portal
-            </div>
-          </div>
+        <div style={{ marginBottom: 12 }}>
+          <DengueGuardLogo
+            markSize={40}
+            textSize={22}
+            textColor={PRIMARY}
+            subTitle="Operations Portal"
+            subTitleColor="#7fb0a4"
+          />
         </div>
 
         <p style={{ margin: '0 0 26px', fontSize: 13, color: '#6b7c77' }}>

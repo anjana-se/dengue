@@ -218,7 +218,7 @@ function mapWorkOrder(o: any, reportMap: Map<string, Report>, zoneMap: Map<strin
       : null,
     lat: r?.lat ?? 6.9271,
     lng: r?.lng ?? 79.8612,
-    zone_name: r?.zone_name ?? (zoneMap.get(o.zone_id || '') || 'Unknown Zone'),
+    zone_name: r?.zone_name ?? zoneMap.get(o.zone_id || '') ?? o.location_name ?? 'Unknown Zone',
     zone_id: r?.zone_id ?? o.zone_id ?? '',
     risk_level: r?.risk_level ?? 'low',
     confidence: r?.confidence ?? 0,

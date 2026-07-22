@@ -67,7 +67,7 @@ export default function Topbar({ mapCapable }: { mapCapable: boolean }) {
     >
       <div>
         <div style={{ fontSize: 11, color: '#94a29d', fontWeight: 500 }}>
-          NDCU · Colombo District
+          NDCU
           {currentUser?.assigned_zone_id ? ' · Zone assigned' : ''}
         </div>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#0f2d27', letterSpacing: '-.01em' }}>

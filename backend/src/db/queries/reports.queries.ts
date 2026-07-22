@@ -55,8 +55,11 @@ export async function createReport(input: CreateReportInput): Promise<Report> {
 export async function findReportById(id: string): Promise<Report | null> {
   const result = await query<Report>(
     `SELECT r.*,
+            z.name AS zone_name,
+            z.district AS zone_district,
             ST_AsGeoJSON(r.geom)::json AS geom_json
      FROM reports r
+     LEFT JOIN zones z ON r.zone_id = z.id
      WHERE r.id = $1`,
     [id],
   );
@@ -110,7 +113,12 @@ export async function listReports(
   const total = parseInt(countResult.rows[0]?.count ?? '0', 10);
 
   const dataResult = await query<Report>(
-    `SELECT r.* FROM reports r ${where}
+    `SELECT r.*,
+            z.name AS zone_name,
+            z.district AS zone_district
+     FROM reports r
+     LEFT JOIN zones z ON r.zone_id = z.id
+     ${where}
      ORDER BY r.created_at DESC
      LIMIT $${idx++} OFFSET $${idx++}`,
     [...params, filter.limit, filter.offset],

@@ -1,6 +1,7 @@
 import { PRIMARY, AMBER } from '../theme';
 import { useStore, allowedViews, pendingDecisions } from '../store/useStore';
 import type { Role, ViewKey } from '../types';
+import { DengueGuardLogo } from './common/DengueGuardLogo';
 
 const ALL_ITEMS: { key: ViewKey; label: string; icon: string; desc: string }[] = [
   { key: 'dashboard',  label: 'Dashboard',      icon: '▦',  desc: 'Overview & analytics' },
@@ -57,34 +58,16 @@ export default function Sidebar() {
           padding: '20px 18px 16px',
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
           borderBottom: '1px solid rgba(255,255,255,.08)',
         }}
       >
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 9,
-            background: '#fff',
-            color: PRIMARY,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: 17,
-          }}
-        >
-          D
-        </div>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-.02em', lineHeight: 1.1 }}>
-            DengueGuard
-          </div>
-          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.45)', fontWeight: 500 }}>
-            Operations Portal
-          </div>
-        </div>
+        <DengueGuardLogo
+          markSize={32}
+          textSize={16}
+          textColor="#fff"
+          subTitle="Operations Portal"
+          subTitleColor="rgba(255,255,255,.45)"
+        />
       </div>
 
       {/* Nav */}

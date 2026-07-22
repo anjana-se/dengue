@@ -59,10 +59,17 @@ export function parseVisionResponse(rawText: string): ParsedAnalysisResult {
   const data = result.data;
   const confidenceThreshold = config.AI_ANALYSIS_CONFIDENCE_THRESHOLD;
   const belowThreshold = data.confidence_score < confidenceThreshold;
-  // Combine the confidence gate with the model's own self-assessment. This can
-  // only ever make the gate MORE conservative (flag more for review) — the
-  // appropriate default for health-surveillance decisions.
-  const needs_human_review = belowThreshold || data.needs_human_review === true;
+  const isInvalidOrNoRisk = data.risk_level === 'none' || data.is_dengue_risk === false;
+
+  // Force needs_human_review = true if confidence is below threshold,
+  // if model requested review, or if image is invalid / no breeding site detected.
+  const needs_human_review = belowThreshold || data.needs_human_review === true || isInvalidOrNoRisk;
+
+  if (isInvalidOrNoRisk && (!data.guidance_text || data.guidance_text.toLowerCase().includes('clear') === false && data.guidance_text.toLowerCase().includes('no') === false)) {
+    data.guidance_text = 'No mosquito breeding site or stagnant water detected in this photo. Please capture a clear image of the stagnant water source.';
+    data.guidance_text_si = 'මෙම ඡායාරූපයේ මදුරුවන් බෝවන ස්ථානයක් හෝ නිශ්චල ජලය හඳුනාගෙන නොමැත. කරුණාකර ජලය රැඳී ඇති ස්ථානයේ පැහැදිලි ඡායාරූපයක් ලබා ගන්න.';
+    data.guidance_text_ta = 'இந்தப் புகைப்படத்தில் கொசு இனப்பெருக்க இடமோ அல்லது தேங்கிய நீரோ கண்டறியப்படவில்லை. தயவுசெய்து நீர் தேங்கியுள்ள இடத்தை தெளிவாகப் படம் பிடித்து அனுப்பவும்.';
+  }
 
   if (needs_human_review) {
     logger.info('Report flagged for human review', {
@@ -70,6 +77,7 @@ export function parseVisionResponse(rawText: string): ParsedAnalysisResult {
       threshold: confidenceThreshold,
       belowThreshold,
       modelFlagged: data.needs_human_review === true,
+      isInvalidOrNoRisk,
     });
   }
 

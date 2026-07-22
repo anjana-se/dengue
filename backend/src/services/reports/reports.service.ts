@@ -112,9 +112,9 @@ export async function createReportService(input: CreateReportServiceInput): Prom
 
   const uploadResult = await storage.upload(input.filePath, destKey, input.mimeType);
 
-  // ── Step 3.5: Geocode coordinates if no zone is assigned ─────────────────
+  // ── Step 3.5: Geocode coordinates for location name ─────────────────
   let locationName: string | null = null;
-  if (!zoneId && latitude != null && longitude != null) {
+  if (latitude != null && longitude != null) {
     locationName = await geocodeCoordinatesService(Number(latitude), Number(longitude));
   }
 

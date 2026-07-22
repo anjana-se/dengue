@@ -209,7 +209,9 @@ export const api = {
       if (res.success && Array.isArray(res.data)) {
         const dict: Record<string, string> = {};
         for (const zone of res.data) {
-          dict[zone.id] = `${zone.district} — ${zone.name}`;
+          if (zone.id && zone.name) {
+            dict[zone.id] = zone.district ? `${zone.district} — ${zone.name}` : zone.name;
+          }
         }
         zonesCache = dict;
         return dict;
@@ -224,7 +226,7 @@ export const api = {
 
   async getReports(): Promise<Report[]> {
     // Refresh zones cache to map zone_id to readable names
-    const zones = Object.keys(zonesCache).length ? zonesCache : await this.fetchZones();
+    const zones = await this.fetchZones();
 
     const res = await this.request("/reports");
     if (res.success && res.data && Array.isArray(res.data.data)) {
@@ -234,7 +236,7 @@ export const api = {
   },
 
   async getReportDetails(id: string): Promise<Report | null> {
-    const zones = Object.keys(zonesCache).length ? zonesCache : await this.fetchZones();
+    const zones = await this.fetchZones();
     const res = await this.request(`/reports/${id}`);
     if (res.success && res.data) {
       return this.mapReport(res.data, zones);
@@ -314,15 +316,22 @@ export const api = {
       }
     }
 
+    const backendZoneName = r.zone_name
+      ? (r.zone_district ? `${r.zone_district} — ${r.zone_name}` : r.zone_name)
+      : null;
+
+    const zoneName = (r.zone_id && zones[r.zone_id])
+      || backendZoneName
+      || r.location_name
+      || (latNum != null && lngNum != null
+        ? `${latNum.toFixed(4)}, ${lngNum.toFixed(4)}`
+        : "Unknown Zone");
+
     return {
       id: r.id,
       risk,
       status,
-      zone: r.zone_id
-        ? zones[r.zone_id] || "Unknown Zone"
-        : r.location_name || (latNum != null && lngNum != null
-        ? `${latNum.toFixed(4)}, ${lngNum.toFixed(4)}`
-        : "Unknown Zone"),
+      zone: zoneName,
       siteType: r.site_type || "Stagnant Water",
       confidence: Math.round(Number(r.confidence_score ?? 0.5) * 100),
       days,

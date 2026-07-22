@@ -13,6 +13,12 @@ interface ResultStepProps {
 export function ResultStep({ result, guidanceText, onReportAnother, onViewReports }: ResultStepProps) {
   const { t } = useI18n();
 
+  const isNoRisk = result?.risk === "none" || (guidanceText && (
+    guidanceText.toLowerCase().includes("no mosquito") ||
+    guidanceText.toLowerCase().includes("no breeding") ||
+    guidanceText.toLowerCase().includes("not appear")
+  ));
+
   return (
     <div
       style={{
@@ -30,7 +36,7 @@ export function ResultStep({ result, guidanceText, onReportAnother, onViewReport
             width: 104,
             height: 104,
             borderRadius: "50%",
-            background: "#E8F3EC",
+            background: isNoRisk ? "#FEF3C7" : "#E8F3EC",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -43,26 +49,33 @@ export function ResultStep({ result, guidanceText, onReportAnother, onViewReport
               position: "absolute",
               inset: 0,
               borderRadius: "50%",
-              border: "2px solid #65A30D",
+              border: isNoRisk ? "2px solid #F59E0B" : "2px solid #65A30D",
               animation: "dgring 2s ease-out infinite",
             }}
           />
-          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M20 6L9 17l-5-5"
-              stroke="#0D4A3E"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {isNoRisk ? (
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="#D97706" strokeWidth="2.5" />
+              <path d="M12 8v4m0 4h.01" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M20 6L9 17l-5-5"
+                stroke="#0D4A3E"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </div>
 
-        <h1 style={{ margin: "0 0 12px", fontSize: 24, fontWeight: 800, color: "#0D4A3E" }}>
-          {t("submit_success_headline")}
+        <h1 style={{ margin: "0 0 12px", fontSize: 24, fontWeight: 800, color: isNoRisk ? "#B45309" : "#0D4A3E" }}>
+          {isNoRisk ? t("no_breeding_site_headline") : t("submit_success_headline")}
         </h1>
         <p style={{ margin: "0 auto 24px", fontSize: 15, lineHeight: 1.5, color: "#4b5a54", maxWidth: 320 }}>
-          {t("submit_success_body")}
+          {isNoRisk ? t("no_breeding_site_body") : t("submit_success_body")}
         </p>
 
         {/* Async status indicator pill */}
@@ -73,8 +86,8 @@ export function ResultStep({ result, guidanceText, onReportAnother, onViewReport
             gap: 8,
             padding: "8px 16px",
             borderRadius: 999,
-            background: "rgba(13,74,62,.07)",
-            color: "#0D4A3E",
+            background: isNoRisk ? "rgba(217,119,6,.1)" : "rgba(13,74,62,.07)",
+            color: isNoRisk ? "#B45309" : "#0D4A3E",
             fontSize: 13,
             fontWeight: 600,
           }}
@@ -84,7 +97,7 @@ export function ResultStep({ result, guidanceText, onReportAnother, onViewReport
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: "#65A30D",
+              background: isNoRisk ? "#F59E0B" : "#65A30D",
               animation: "dgpulse 1.4s infinite",
             }}
           />
@@ -97,15 +110,15 @@ export function ResultStep({ result, guidanceText, onReportAnother, onViewReport
               marginTop: 20,
               padding: 16,
               borderRadius: 16,
-              background: "#fff",
-              border: "1px solid rgba(13,74,62,.12)",
+              background: isNoRisk ? "#FFFBEB" : "#fff",
+              border: isNoRisk ? "1px solid #FCD34D" : "1px solid rgba(13,74,62,.12)",
               textAlign: "left",
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0D4A3E", marginBottom: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: isNoRisk ? "#B45309" : "#0D4A3E", marginBottom: 6 }}>
               {t("guidance_label")}
             </div>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "#1c2b26" }}>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: isNoRisk ? "#78350F" : "#1c2b26" }}>
               {guidanceText}
             </p>
           </div>
