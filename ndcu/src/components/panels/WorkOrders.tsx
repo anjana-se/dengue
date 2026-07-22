@@ -47,9 +47,31 @@ export default function WorkOrders() {
   const selectZone = useStore((s) => s.selectZone);
 
   const [filter, setFilter] = useState<'all' | 'new' | 'assigned' | 'in_progress' | 'resolved'>('all');
+  const [assignedFilter, setAssignedFilter] = useState<'all' | 'assigned' | 'unassigned'>('all');
+  const [search, setSearch] = useState('');
 
   const filtered = [...orders]
     .filter((o) => filter === 'all' || o.status === filter)
+    .filter((o) =>
+      assignedFilter === 'all'
+        ? true
+        : assignedFilter === 'assigned'
+        ? Boolean(o.assigned_to)
+        : !o.assigned_to,
+    )
+    .filter((o) => {
+      if (!search.trim()) return true;
+      const term = search.trim().toLowerCase();
+      return [
+        o.zone_name,
+        o.site_type,
+        o.assigned_to?.name || 'Unassigned',
+        o.description,
+        o.remediation_action,
+      ]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(term));
+    })
     .filter((o) => {
       if (!selZone) return true;
       if (o.zone_id === selZone.zone_id) return true;
@@ -90,59 +112,101 @@ export default function WorkOrders() {
           borderBottom: '1px solid #eef1f0',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: 12,
           flexWrap: 'wrap',
           background: selZone ? '#EFF6FF' : '#fff',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 15, fontWeight: 600 }}>Work Orders</span>
-          {selZone && (
-            <span
-              onClick={() => selectZone(null)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>Work Orders</span>
+            {selZone && (
+              <span
+                onClick={() => selectZone(null)}
+                style={{
+                  fontSize: 12,
+                  background: '#2563EB',
+                  color: '#fff',
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                Zone: {selZone.meta_name || selZone.name} ✕
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by zone, site, assignee or note…"
               style={{
-                fontSize: 12,
-                background: '#2563EB',
-                color: '#fff',
-                padding: '2px 8px',
-                borderRadius: 12,
-                cursor: 'pointer',
-                fontWeight: 600,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
+                flex: 1,
+                minWidth: 200,
+                height: 34,
+                padding: '0 12px',
+                borderRadius: 10,
+                border: '1px solid #d5ddda',
+                background: '#f8faf7',
+                fontSize: 13,
+                color: '#334b45',
               }}
-            >
-              Zone: {selZone.meta_name || selZone.name} ✕
-            </span>
-          )}
+            />
+          </div>
         </div>
 
-        {/* Filters */}
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['all', 'new', 'assigned', 'in_progress', 'resolved'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                padding: '4px 11px',
-                border: `1px solid ${filter === f ? '#0b6b57' : '#d5ddda'}`,
-                borderRadius: 20,
-                background: filter === f ? '#E7F7F0' : '#fff',
-                cursor: 'pointer',
-                fontFamily: 'Inter',
-                fontSize: 11.5,
-                fontWeight: filter === f ? 700 : 500,
-                color: filter === f ? '#0b6b57' : '#6b7c77',
-              }}
-            >
-              {f === 'all' ? 'All' : f === 'in_progress' ? 'In progress' : f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {(['all', 'assigned', 'unassigned'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setAssignedFilter(mode)}
+                style={{
+                  padding: '6px 12px',
+                  border: `1px solid ${assignedFilter === mode ? '#0b6b57' : '#d5ddda'}`,
+                  borderRadius: 20,
+                  background: assignedFilter === mode ? '#E7F7F0' : '#fff',
+                  cursor: 'pointer',
+                  fontFamily: 'Inter',
+                  fontSize: 11.5,
+                  fontWeight: assignedFilter === mode ? 700 : 500,
+                  color: assignedFilter === mode ? '#0b6b57' : '#6b7c77',
+                }}
+              >
+                {mode === 'all' ? 'All' : mode === 'assigned' ? 'Assigned' : 'Unassigned'}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {(['all', 'new', 'assigned', 'in_progress', 'resolved'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{
+                  padding: '4px 11px',
+                  border: `1px solid ${filter === f ? '#0b6b57' : '#d5ddda'}`,
+                  borderRadius: 20,
+                  background: filter === f ? '#E7F7F0' : '#fff',
+                  cursor: 'pointer',
+                  fontFamily: 'Inter',
+                  fontSize: 11.5,
+                  fontWeight: filter === f ? 700 : 500,
+                  color: filter === f ? '#0b6b57' : '#6b7c77',
+                }}
+              >
+                {f === 'all' ? 'All' : f === 'in_progress' ? 'In progress' : f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+          <span style={{ fontSize: 12, color: '#94a29d', fontWeight: 600, whiteSpace: 'nowrap' }}>{filtered.length} orders</span>
         </div>
-
-        <span style={{ fontSize: 12, color: '#94a29d', fontWeight: 600 }}>{filtered.length} orders</span>
       </div>
 
       {/* Table */}
