@@ -118,7 +118,7 @@ export async function generateGeminiChatReply(
       }
 
       // Append the model's tool-call turn, then execute each call and append the
-      // results as a single `function` turn.
+      // results as a single user turn of functionResponse parts.
       const modelContent = response.candidates?.[0]?.content;
       if (modelContent) contents.push(modelContent);
 
@@ -134,7 +134,9 @@ export async function generateGeminiChatReply(
           functionResponse: { name: call.name, response: { result: output } },
         });
       }
-      contents.push({ role: 'function', parts: responseParts });
+      // Gemini accepts only 'user'/'model' roles; function results are sent as
+      // functionResponse parts inside a 'user' turn (not a 'function' role).
+      contents.push({ role: 'user', parts: responseParts });
     }
 
     // Unreachable in practice (the i === MAX_TOOL_ITERATIONS branch returns).
