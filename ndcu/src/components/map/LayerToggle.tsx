@@ -134,9 +134,9 @@ export default function LayerToggle() {
     >
       <div style={{ fontSize: 12, fontWeight: 700, color: '#0f2d27' }}>Map layers</div>
       <Hdr>Current data</Hdr>
-      {row('community', 'Breeding site reports', PRIMARY)}
+      {row('community', 'Breeding site reports')}
       {row('zones', 'Zone risk heatmap')}
-      {row('traps', 'IoT trap network', '#0F6E56')}
+      {row('traps', 'IoT trap network')}
       {layers.traps && (
         <div style={{ margin: '2px 0 6px 22px' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#94a29d', marginBottom: 4 }}>View</div>

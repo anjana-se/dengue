@@ -11,7 +11,17 @@ import { BadRequestError } from '../shared/httpErrors';
  * - Filename: timestamp + original extension for uniqueness
  */
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/tiff',
+  'image/dng',
+  'image/x-adobe-dng',
+  'image/heic',
+  'image/heif',
+  'application/octet-stream',
+];
 
 const storage = multer.diskStorage({
   // Pass the destination as a STRING (not a function) so multer's disk driver

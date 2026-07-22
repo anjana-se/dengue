@@ -2,10 +2,15 @@ import type { Report, WorkOrder, Zone, SourceType, ReportStatus, WorkOrderStatus
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:3000/api/v1';
 
-// Normalize any absolute backend origin on an /uploads/ image URL to a same-origin relative
-// path, so <img> loads over HTTPS through the CloudFront proxy (no mixed content).
-export const toRelativeUpload = (u?: string | null): string | null =>
-  u ? u.replace(/^https?:\/\/[^/]+(\/uploads\/)/, '$1') : null;
+export const getImageUrl = (u?: string | null): string | null => {
+  if (!u) return null;
+  if (u.startsWith('data:') || u.startsWith('blob:')) return u;
+  if (u.startsWith('http://') || u.startsWith('https://')) return u;
+  const origin = API_BASE.replace(/\/api\/v1\/?$/, '');
+  return `${origin}${u.startsWith('/') ? '' : '/'}${u}`;
+};
+
+export const toRelativeUpload = getImageUrl;
 
 interface TokenPair {
   access_token: string;
@@ -37,6 +42,7 @@ const mapRawReport = (r: any, zoneMap: Map<string, string>): Report => {
     report_id: r.id,
     report_no: r.report_no,
     source_type: (r.source_type || 'community') as SourceType,
+    drone_mission_id: r.drone_mission_id || null,
     lat: r.latitude != null ? Number(r.latitude) : 0,
     lng: r.longitude != null ? Number(r.longitude) : 0,
     description: r.notes || '',
@@ -243,6 +249,7 @@ export const api = {
         report_id: r.id,
         report_no: r.report_no,
         source_type: (r.source_type || 'community') as SourceType,
+        drone_mission_id: r.drone_mission_id || null,
         lat: r.latitude != null ? Number(r.latitude) : 0,
         lng: r.longitude != null ? Number(r.longitude) : 0,
         description: r.notes || '',
@@ -363,8 +370,16 @@ export const api = {
 
   async uploadDroneFrame(missionId: string, file: File): Promise<any> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('image', file);
     const res = await this.request(`/drone/missions/${missionId}/frames`, { method: 'POST', body: formData });
+    return res.data;
+  },
+
+  async updateMissionStatus(missionId: string, status: string): Promise<any> {
+    const res = await this.request(`/drone/missions/${missionId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
     return res.data;
   },
 
