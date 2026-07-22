@@ -2,6 +2,11 @@ import type { Report, WorkOrder, Zone, SourceType, ReportStatus, WorkOrderStatus
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:3000/api/v1';
 
+// Normalize any absolute backend origin on an /uploads/ image URL to a same-origin relative
+// path, so <img> loads over HTTPS through the CloudFront proxy (no mixed content).
+export const toRelativeUpload = (u?: string | null): string | null =>
+  u ? u.replace(/^https?:\/\/[^/]+(\/uploads\/)/, '$1') : null;
+
 interface TokenPair {
   access_token: string;
   refresh_token: string;
@@ -493,7 +498,7 @@ export const api = {
       needs_human_review: !!r.needs_human_review,
       guidance_text_si: r.guidance_text_si || '',
       guidance_text_ta: r.guidance_text_ta || '',
-      image_url: r.image_url ?? null,
+      image_url: toRelativeUpload(r.image_url),
     }));
     const decisions: Decision[] = d.decisions || [];
     return { inc, reports, decisions };
@@ -519,8 +524,8 @@ export const api = {
       time_diff_h: d.time_diff_h,
       new_lat: d.new_lat,
       new_lng: d.new_lng,
-      new_image_url: d.new_image_url ?? null,
-      inc_image_url: d.inc_image_url ?? null,
+      new_image_url: toRelativeUpload(d.new_image_url),
+      inc_image_url: toRelativeUpload(d.inc_image_url),
     }));
   },
 

@@ -32,6 +32,12 @@ const envSchema = z.object({
   // AI Service Provider Configuration
   AI_PROVIDER: z.enum(['gemini', 'nvidia']).default('gemini'),
 
+  // Chat assistant provider (separate from the vision AI_PROVIDER above).
+  // Only 'gemini' is implemented today; the chat integration is routed through a
+  // factory (integrations/chatAssistant.ts) so a 'claude' driver can be added
+  // later by extending this enum + the factory — no caller changes required.
+  CHAT_PROVIDER: z.enum(['gemini']).default('gemini'),
+
   // Gemini AI
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_CHAT_MODEL: z.string().default('gemini-2.0-flash-lite'),
@@ -53,6 +59,13 @@ const envSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   SIGNED_URL_EXPIRES_SECONDS: z.coerce.number().int().positive().default(900),
   MAX_UPLOAD_SIZE_MB: z.coerce.number().int().positive().default(15),
+
+  // Reverse proxy — number of trusted hops for Express `trust proxy`.
+  // 0 = local dev (no proxy); 1 = behind a single reverse proxy (e.g. Nginx).
+  // NOTE: never set this to a value that trusts more hops than actually exist —
+  // a permissive setting lets clients spoof X-Forwarded-For, bypassing IP rate
+  // limiting and corrupting the client IP recorded in audit_log.
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 
   // CORS
   CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),

@@ -305,15 +305,9 @@ export const api = {
 
     let imageUrl = r.image_url || undefined;
     if (imageUrl) {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
-      try {
-        const apiOrigin = new URL(API_BASE).origin;
-        if (imageUrl.startsWith("http://localhost:3000")) {
-          imageUrl = imageUrl.replace("http://localhost:3000", apiOrigin);
-        }
-      } catch (e) {
-        // Fallback to original url
-      }
+      // Normalize any absolute backend origin on an /uploads/ image URL to a same-origin
+      // relative path, so it loads over HTTPS through the CloudFront proxy (no mixed content).
+      imageUrl = imageUrl.replace(/^https?:\/\/[^/]+(\/uploads\/)/, "$1");
     }
 
     const backendZoneName = r.zone_name

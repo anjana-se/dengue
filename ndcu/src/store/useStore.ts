@@ -34,7 +34,7 @@ import { mkCases, pick } from '../data/mock';
 import { mkTraps } from '../data/traps';
 import { uuid } from '../utils/uuid';
 import { loadLS, saveLS } from '../utils/storage';
-import { api } from '../lib/api';
+import { api, toRelativeUpload } from '../lib/api';
 
 const DEFAULT_LAYERS: Layers = {
   zones: true,
@@ -226,7 +226,7 @@ function mapWorkOrder(o: any, reportMap: Map<string, Report>, zoneMap: Map<strin
     remediation_action: o.remediation_action || r?.remediation_action || 'Apply Larvicide',
     guidance_text: r?.guidance_text ?? 'Vector inspection.',
     larvae_visible: r?.larvae_visible ?? 'unclear',
-    image_url: o.follow_up_image_url || null,
+    image_url: toRelativeUpload(o.follow_up_image_url),
     description: r?.description || '',
     ndcu_instructions: o.notes || '',
     notes: o.resolution_notes || '',

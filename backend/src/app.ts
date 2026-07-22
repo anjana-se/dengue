@@ -33,8 +33,11 @@ import incidentsRouter from './services/incidents/incidents.routes';
 export function createApp() {
   const app = express();
 
-  // Trust proxy headers from reverse proxy (Nginx)
-  app.set('trust proxy', true);
+  // Trust exactly TRUST_PROXY hops of X-Forwarded-For (0 = none in local dev,
+  // 1 = behind a single reverse proxy like Nginx). A specific hop count keeps
+  // req.ip accurate for rate limiting + audit logging; the permissive `true`
+  // would let clients spoof their IP (ERR_ERL_PERMISSIVE_TRUST_PROXY).
+  app.set('trust proxy', config.TRUST_PROXY);
 
   // ─── Core middleware ─────────────────────────────────────────────────────────
   app.use(helmet({

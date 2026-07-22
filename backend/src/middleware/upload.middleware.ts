@@ -14,9 +14,10 @@ import { BadRequestError } from '../shared/httpErrors';
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, config.UPLOADS_DIR);
-  },
+  // Pass the destination as a STRING (not a function) so multer's disk driver
+  // runs fs.mkdirSync(recursive) for us — a function destination skips that and
+  // throws ENOENT when UPLOADS_DIR doesn't exist yet (it's git-ignored).
+  destination: config.UPLOADS_DIR,
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
