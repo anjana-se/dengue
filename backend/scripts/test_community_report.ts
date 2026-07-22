@@ -12,11 +12,16 @@ async function testCommunityReport() {
     fs.writeFileSync(tmpImg, 'fake-jpeg-data');
   }
 
+  // Create staff user or get existing user ID to satisfy foreign key
+  const userRes = await pool.query(`SELECT id FROM users LIMIT 1`);
+  const userId = userRes.rows[0]?.id;
+
   // Submit community report in Colombo Fort area (6.935, 79.848)
   const report = await createReportService({
     filePath: tmpImg,
     mimeType: 'image/jpeg',
     sourceType: 'community',
+    reporterId: userId,
     latitude: 6.935,
     longitude: 79.848,
     language: 'en',

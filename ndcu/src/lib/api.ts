@@ -218,7 +218,10 @@ export const api = {
           guidance_text_ta: r.guidance_text_ta || ai.guidance_text_ta || '',
         },
         zone_id: r.zone_id || '',
-        zone_name: zoneMap.get(r.zone_id || '') || r.location_name || 'Unknown Zone',
+        zone_name: zoneMap.get(r.zone_id || '')
+          || (r.zone_name ? (r.zone_district ? `${r.zone_district} — ${r.zone_name}` : r.zone_name) : null)
+          || r.location_name
+          || (r.latitude != null && r.longitude != null ? `${Number(r.latitude).toFixed(4)}, ${Number(r.longitude).toFixed(4)}` : 'Unknown Zone'),
         created_at: r.created_at || new Date().toISOString(),
         image_url: r.image_url ?? null,
       };
@@ -414,7 +417,10 @@ export const api = {
       site_type: r.site_type || inc?.site_type || 'other',
       lat: r.lat != null ? Number(r.lat) : (inc?.lat ?? 0),
       lng: r.lng != null ? Number(r.lng) : (inc?.lng ?? 0),
-      zone_name: r.location_name || inc?.zone_name || 'Unknown Zone',
+      zone_name: r.location_name
+        || (r.zone_name ? (r.zone_district ? `${r.zone_district} — ${r.zone_name}` : r.zone_name) : null)
+        || inc?.zone_name
+        || (r.lat != null && r.lng != null ? `${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}` : 'Unknown Zone'),
       incident_id: id,
       larvae_visible: normalizeLarvae(r.larvae_visible),
       water_present: !!r.water_present,
