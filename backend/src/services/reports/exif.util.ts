@@ -1,7 +1,7 @@
 import { logger } from '../../shared/logger';
 
 /**
- * services/reports/exif.util.ts — GPS EXIF extraction from image files.
+ * services/reports/exif.util.ts — GPS EXIF extraction and validation from image files.
  * Used for community uploads (user may not manually enter coordinates)
  * and drone images (GPS baked in by the drone).
  *
@@ -15,14 +15,23 @@ export interface GpsCoordinates {
   altitude?: number;
 }
 
+export interface ExifMetadataResult {
+  gps: GpsCoordinates | null;
+  cameraMake?: string;
+  cameraModel?: string;
+  capturedAt?: Date;
+  isValidGps: boolean;
+  isSriLanka: boolean;
+  validationStatus: 'valid' | 'out_of_bounds' | 'zone_mismatch' | 'out_of_zone_bounds' | 'missing_gps' | 'error';
+  rawExif?: Record<string, any>;
+}
+
 /**
  * Extracts GPS coordinates from an image file.
  * Returns null if the image has no GPS data (e.g. screenshot, stock photo).
  */
 export async function extractGps(filePath: string): Promise<GpsCoordinates | null> {
   try {
-    // Dynamic import — exifr is ESM, importing it dynamically keeps the rest
-    // of the codebase as CommonJS without an interop headache.
     const exifr = await import('exifr');
     const gps = await exifr.gps(filePath);
 
@@ -34,15 +43,66 @@ export async function extractGps(filePath: string): Promise<GpsCoordinates | nul
     return {
       latitude: gps.latitude,
       longitude: gps.longitude,
+      altitude: (gps as any).altitude ?? undefined,
     };
   } catch (err) {
-    // EXIF parsing failure is non-fatal — the report can still be created
-    // without coordinates (zone assignment will be skipped)
-    logger.warn('EXIF extraction failed', {
+    logger.warn('EXIF GPS extraction failed', {
       filePath,
       error: (err as Error).message,
     });
     return null;
+  }
+}
+
+/**
+ * Extracts full EXIF metadata and validates GPS bounds.
+ */
+export async function extractExifMetadata(filePath: string): Promise<ExifMetadataResult> {
+  try {
+    const exifr = await import('exifr');
+    const output = await exifr.parse(filePath, {
+      gps: true,
+      exif: true,
+      tiff: true,
+      xmp: true,
+    }).catch(() => null);
+
+    const gps = await extractGps(filePath);
+    if (!gps) {
+      return {
+        gps: null,
+        cameraMake: output?.Make,
+        cameraModel: output?.Model,
+        capturedAt: output?.DateTimeOriginal ? new Date(output.DateTimeOriginal) : undefined,
+        isValidGps: false,
+        isSriLanka: false,
+        validationStatus: 'missing_gps',
+        rawExif: output || undefined,
+      };
+    }
+
+    const validLanka = isWithinSriLanka(gps.latitude, gps.longitude);
+    return {
+      gps,
+      cameraMake: output?.Make,
+      cameraModel: output?.Model,
+      capturedAt: output?.DateTimeOriginal ? new Date(output.DateTimeOriginal) : undefined,
+      isValidGps: true,
+      isSriLanka: validLanka,
+      validationStatus: validLanka ? 'valid' : 'out_of_bounds',
+      rawExif: output || undefined,
+    };
+  } catch (err: any) {
+    logger.warn('EXIF full metadata extraction failed', {
+      filePath,
+      error: err.message,
+    });
+    return {
+      gps: null,
+      isValidGps: false,
+      isSriLanka: false,
+      validationStatus: 'error',
+    };
   }
 }
 
